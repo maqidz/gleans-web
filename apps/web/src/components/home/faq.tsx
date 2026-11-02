@@ -44,7 +44,7 @@ export function Faq() {
             >
               <AccordionPrimitive.Header>
                 <AccordionPrimitive.Trigger className="flex w-full items-center justify-between gap-4 rounded-[24px] p-5 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/40 md:p-6">
-                  <span className="text-lg md:text-xl lg:text-2xl group-data-[state=open]:font-semibold">{f.q}</span>
+                  <span className="text-lg md:text-xl lg:text-2xl">{f.q}</span>
                   <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#fafafa] transition-colors group-data-[state=open]:bg-primary group-data-[state=open]:text-white md:size-12">
                     <Plus className="size-5 transition-transform group-data-[state=open]:rotate-45 md:size-6" />
                   </span>

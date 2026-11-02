@@ -33,7 +33,7 @@ export function AuthNav({ onNavigate }: { onNavigate?: () => void }) {
   }, [pathname, retry]);
   if (failed && !account) return <Button size="pill-sm" variant="outline" onClick={() => { setFailed(false); setRetry(value => value + 1); }}>Muat ulang akun</Button>;
   if (account === undefined) return <span role="status" aria-label="Memuat akun" className="h-10 w-24 animate-pulse rounded-full bg-muted" />;
-  if (!account) return <div className="flex items-center gap-6"><Button asChild size="pill-sm" variant="outline"><Link href="/masuk" onClick={onNavigate}>Masuk</Link></Button><Button asChild size="pill-sm"><Link href="/daftar" onClick={onNavigate}>Daftar</Link></Button></div>;
+  if (!account) return <div className="flex items-center gap-3"><Button asChild size="pill-sm" variant="outline" className="w-[100px]"><Link href="/masuk" onClick={onNavigate}>Masuk</Link></Button><Button asChild size="pill-sm" className="w-[100px]"><Link href="/daftar" onClick={onNavigate}>Daftar</Link></Button></div>;
   return <DropdownMenu>
     <DropdownMenuTrigger asChild>
       <Button variant="ghost" aria-label={`Menu akun ${account.name}`} className="h-11 min-w-0 gap-2 rounded-full border border-border bg-white px-3">

@@ -1,8 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, CheckCircle2, Download, FileText, FileUp, Loader2, Plus, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowRightLeft, Files, Minimize2, CheckCircle2, Download, FileText, FileUp, Loader2, Plus, X } from "lucide-react";
 import { Tabs } from "radix-ui";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@gleans/ui/button";
@@ -11,9 +10,9 @@ import { cn } from "@/lib/utils";
 import type { FileResult } from "@gleans/file-tools/tools";
 
 const TOOLS = [
-  { id: "convert", label: "Convert", action: "Konversi", formats: "DOCX, DOC, TXT, PNG dan JPEG" },
-  { id: "merge", label: "Merge", action: "Gabungkan", formats: "PDF" },
-  { id: "compress", label: "Compress", action: "Kompres", formats: "PDF" },
+  { id: "convert", label: "Convert", icon: ArrowRightLeft, action: "Konversi", formats: "DOCX, DOC, TXT, PNG dan JPEG" },
+  { id: "merge", label: "Merge", icon: Files, action: "Gabungkan", formats: "PDF" },
+  { id: "compress", label: "Compress", icon: Minimize2, action: "Kompres", formats: "PDF" },
 ] as const;
 type ToolId = (typeof TOOLS)[number]["id"];
 type Downloadable = Omit<FileResult, "bytes"> & { blob: Blob };
@@ -36,13 +35,12 @@ export function FileWorkspace() {
   const [busy, setBusy] = useState(false);
 
   return (
-    <Tabs.Root defaultValue="merge" className="flex min-w-0 flex-col gap-6">
+    <Tabs.Root defaultValue="convert" className="flex min-w-0 flex-col gap-6">
       <Tabs.List aria-label="Alat Gleans File" className="grid w-full max-w-[520px] grid-cols-3 self-center rounded-full border bg-white p-1.5 sm:p-2">
         {TOOLS.map((tool) => (
           <Tabs.Trigger key={tool.id} value={tool.id} disabled={busy}
             className="group flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-full px-2 text-xs font-medium uppercase transition-colors hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-wait disabled:opacity-60 data-[state=active]:bg-primary data-[state=active]:text-white sm:min-h-12 sm:gap-3 sm:px-4 sm:text-base">
-            <Image src="/images/logo-gleans-file.svg" alt="" width={24} height={24}
-              className="hidden size-5 shrink-0 group-data-[state=active]:brightness-0 group-data-[state=active]:invert min-[375px]:block sm:size-6" />
+            <tool.icon aria-hidden="true" strokeWidth={1.75} className="size-4 shrink-0 text-primary group-data-[state=active]:text-white sm:size-5" />
             {tool.label}
           </Tabs.Trigger>
         ))}

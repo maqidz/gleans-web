@@ -8,12 +8,41 @@ after(() => rm(dir, { recursive: true, force: true }));
 await writeFile(`${dir}/model.mjs`, ts.transpileModule(await readFile('src/features/admin/lib/model.ts','utf8'), {compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText);
 await writeFile(`${dir}/media.mjs`,ts.transpileModule(await readFile('src/features/admin/lib/media.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText);
 const {validateMedia}=await import(`${dir}/media.mjs`);
-const {initialAdmin,saveAdminRecord,adminSchema,ADMIN_STORAGE_KEY,inviteDemoAdmin,revokeDemoAdmin,upgradeAdminDemo} = await import(`${dir}/model.mjs`);
+const {initialAdmin,saveAdminRecord,adminSchema,ADMIN_STORAGE_KEY,inviteDemoAdmin,revokeDemoAdmin,upgradeAdminDemo,normalizeAdminOrderId} = await import(`${dir}/model.mjs`);
 await writeFile(`${dir}/retention.mjs`,ts.transpileModule(await readFile('src/lib/shield-retention.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText);
 const {shieldAccess,SHIELD_RETENTION_MS}=await import(`${dir}/retention.mjs`);
 test('demo state round-trips with its own storage namespace',()=>{
  assert.ok(ADMIN_STORAGE_KEY.includes('admin-demo'));
  const state=initialAdmin(); assert.deepEqual(adminSchema.parse(JSON.parse(JSON.stringify(state))),state);
+});
+test('GLS migration preserves saved orders, history references, and notification read IDs',()=>{
+ const state=initialAdmin();state.demoVersion=3;
+ state.orders=state.orders.map(order=>({...order,id:order.id.replace(/^GLS-/, 'SH-')}));
+ state.orders[0].document='Edited document.pdf';
+ state.activity[0].object=state.orders[0].id;
+ const completedAt=state.orders[1].completedAt;
+ const next=upgradeAdminDemo(state);
+ assert.equal(next.demoVersion,5);
+ assert.ok(next.orders.every(order=>order.id.startsWith('GLS-')));
+ assert.equal(next.orders.length,state.orders.length);
+ assert.equal(next.orders[0].document,'Edited document.pdf');
+ assert.equal(next.orders[1].completedAt,completedAt);
+ assert.equal(next.activity[0].object,next.orders[0].id);
+ assert.equal(normalizeAdminOrderId('SH-1002:Masa unduh berakhir:2026-10-08'),`${initialAdmin().orders[1].id}:Masa unduh berakhir:2026-10-08`);
+ assert.match(normalizeAdminOrderId('DEMO-ABC123'),/^GLS-[0-9A-F]{12}$/);
+ assert.equal(normalizeAdminOrderId('USR-001'),'USR-001');
+ assert.deepEqual(upgradeAdminDemo(next),next);
+});
+test('all demo invoices use twelve hex characters and old short links still resolve',()=>{
+ const state=initialAdmin();state.demoVersion=4;
+ state.orders=state.orders.map((order,index)=>({...order,id:`GLS-${1001+index}`}));
+ const next=upgradeAdminDemo(state);
+ assert.ok(next.orders.every(order=>/^GLS-[0-9A-F]{12}$/.test(order.id)));
+ assert.equal(new Set(next.orders.map(order=>order.id)).size,next.orders.length);
+ assert.equal(normalizeAdminOrderId('SH-1002'),next.orders[1].id);
+ assert.equal(normalizeAdminOrderId('GLS-1002'),next.orders[1].id);
+ assert.equal(normalizeAdminOrderId('GLS-E23E68C14649'),'GLS-E23E68C14649');
+ assert.deepEqual(upgradeAdminDemo(next),next);
 });
 test('wallet adjustments require a reason and preserve unrelated records',()=>{
  const state=initialAdmin(),customer={...state.customers[0],quota:7};

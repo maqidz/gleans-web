@@ -4,14 +4,20 @@ import { Button } from "@gleans/ui/button";
 import { uploadPaymentFile } from "@/features/payments/upload-file";
 import type { PaymentOrder } from "@/features/payments/types";
 import { formatBytes, formatRupiah } from "@/lib/format";
+import { ORDER_ARRIVED_EVENT } from "../lib/order-alerts";
 export function ShieldOrders() {
   const [orders, setOrders] = useState<(PaymentOrder & { whatsapp: string; document_bytes: number })[]>([]);
   const [error, setError] = useState(""); const [busy, setBusy] = useState<string | null>(null);
   const load = useCallback(async () => {
-    try { const response = await fetch("/api/admin/shield-orders", { cache: "no-store" }); const data = await response.json(); if (!response.ok) throw new Error(data.error); setOrders(data.orders); }
+    try { const response = await fetch("/api/admin/shield-orders", { cache: "no-store" }); const data = await response.json(); if (!response.ok) throw new Error(data.error); setOrders(data.orders); setError(""); }
     catch (error) { setError(error instanceof Error ? error.message : "Pesanan belum dapat dimuat."); }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const refresh = () => { void load(); };
+    refresh();
+    window.addEventListener(ORDER_ARRIVED_EVENT, refresh);
+    return () => window.removeEventListener(ORDER_ARRIVED_EVENT, refresh);
+  }, [load]);
   async function process(id: string) {
     setBusy(id); setError("");
     try { const response = await fetch(`/api/admin/shield-orders/${id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "process" }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error); await load(); }

@@ -6,7 +6,7 @@ import { ArrowUpRight, Eye, Search } from "lucide-react";
 import { Button } from "@gleans/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@gleans/ui/dialog";
 import { formatRupiah } from "@/lib/format";
-import { type AdminState } from "@/features/admin/lib/model";
+import { normalizeAdminOrderId, type AdminState } from "@/features/admin/lib/model";
 import { useAdmin } from "./provider";
 import { shieldAccess } from "@/lib/shield-retention";
 import { summaryDemo } from "@/features/admin/lib/summary-demo";
@@ -56,10 +56,11 @@ export function AdminRecordsTable({ module }: { module: "pesanan" | "pelanggan" 
   const customer = isOrder ? customerFor(order?.customerId || "") : customerFor(selected || "");
 
   useEffect(() => {
-    const id = params.get("detail");
+    const rawId = params.get("detail");
+    const id = rawId && isOrder ? normalizeAdminOrderId(rawId) : rawId;
     if (!id) opened.current = null;
     if (id && opened.current !== id) { opened.current = id; setSelected(id); }
-  }, [params]);
+  }, [params, isOrder]);
 
   function close() {
     setSelected(null);

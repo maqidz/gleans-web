@@ -13,7 +13,7 @@
     "test:file": "npm run build:doc-worker && node scripts/test-file-tools.mjs",
     "test:cite": "node scripts/test-citation.mjs",
     "test:dashboard": "node scripts/test-dashboard.mjs",
-    "test:admin": "node scripts/test-admin.mjs",
+    "test:admin": "node scripts/test-admin.mjs && node --test tests/admin-order-alerts.test.mjs",
     "typecheck": "tsc --noEmit",
     "test": "pnpm test:payments && pnpm test:auth && pnpm test:admin && pnpm test:dashboard && pnpm test:cite && pnpm test:file",
     "test:auth": "node --test tests/auth-session.test.mjs",

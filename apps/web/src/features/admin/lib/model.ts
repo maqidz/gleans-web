@@ -1,4 +1,12 @@
 import { z } from "zod";
+const DEMO_ORDER_IDS: Record<string, string> = {
+  "1001": "GLS-B7F4B7D6157B",
+  "1002": "GLS-9B421EF494C4",
+  "1003": "GLS-0253DFCE4B4E",
+  "1004": "GLS-9F25950981B1",
+  "1005": "GLS-24252AE2B211",
+  "1006": "GLS-6790C6A3D0FD",
+};
 export const ADMIN_STORAGE_KEY = "gleans:admin-demo:v1";
 export const modules = ["pesanan", "pelanggan", "paket-transaksi", "blog", "promosi", "pengaturan"] as const;
 export type Module = typeof modules[number];
@@ -19,10 +27,10 @@ export type RecordData = AdminState[Collection][number];
 export function initialAdmin(now = Date.now()): AdminState {
   const stamp = (hours: number) => new Date(Math.floor(now / 60000) * 60000 - hours * 3600000).toISOString();
   return {
-    demoVersion: 3,
+    demoVersion: 5,
     admins: defaultAdmins.map(a=>({...a})),
     customers: [{ id: "USR-001", name: "Alya Putri", email: "alya@example.com", whatsapp: "081234567890", balance: 50000, quota: 2 }, { id: "USR-002", name: "Raka Pratama", email: "raka@example.com", whatsapp: "081234567891", balance: 25000, quota: 5 }, { id: "USR-003", name: "Nadia Safitri", email: "nadia@example.com", whatsapp: "081234567892", balance: 0, quota: 0 }],
-    orders: [{ id: "SH-1001", customerId: "USR-001", document: "Proposal penelitian.pdf", amount: 10000, payment: "Berhasil", processing: "Antre", delivery: "Belum dikirim", note: "", date: "2026-10-08" }, { id: "SH-1002", customerId: "USR-002", document: "Makalah metodologi.docx", amount: 10000, payment: "Berhasil", processing: "Selesai", delivery: "Terkirim", note: "", completedAt: stamp(4), date: "2026-10-08" }, { id: "SH-1003", customerId: "USR-003", document: "Bab pendahuluan.pdf", amount: 10000, payment: "Menunggu", processing: "Belum diproses", delivery: "Belum dikirim", note: "", date: "2026-10-07" }, { id: "SH-1004", customerId: "USR-001", document: "Literatur penelitian.pdf", amount: 10000, payment: "Berhasil", processing: "Gagal", delivery: "Belum dikirim", failureReason: "timeout", note: "Layanan GPTZero tidak merespons dalam batas waktu (skenario demo). Hasil belum tersedia. Periksa kondisi layanan sebelum mencoba ulang.", date: "2026-10-07" }, { id: "SH-1005", customerId: "USR-001", document: "Esai akademik.pdf", amount: 10000, payment: "Berhasil", processing: "Selesai", delivery: "Terkirim", note: "Masa unduh 24 jam telah berakhir. Dokumen dan laporan tidak lagi tersedia.", completedAt: stamp(26), date: "2026-10-07" }, { id: "SH-1006", customerId: "USR-003", document: "Tinjauan pustaka.docx", amount: 10000, payment: "Berhasil", processing: "Antre", delivery: "Belum dikirim", failureReason: "rate_limit", note: "Batas request GPTZero sementara tercapai (skenario demo). Tetap di antrean untuk dicoba ulang setelah jeda; masa unduh belum dimulai.", date: "2026-10-09" }],
+    orders: [{ id: DEMO_ORDER_IDS["1001"], customerId: "USR-001", document: "Proposal penelitian.pdf", amount: 10000, payment: "Berhasil", processing: "Antre", delivery: "Belum dikirim", note: "", date: "2026-10-08" }, { id: DEMO_ORDER_IDS["1002"], customerId: "USR-002", document: "Makalah metodologi.docx", amount: 10000, payment: "Berhasil", processing: "Selesai", delivery: "Terkirim", note: "", completedAt: stamp(4), date: "2026-10-08" }, { id: DEMO_ORDER_IDS["1003"], customerId: "USR-003", document: "Bab pendahuluan.pdf", amount: 10000, payment: "Menunggu", processing: "Belum diproses", delivery: "Belum dikirim", note: "", date: "2026-10-07" }, { id: DEMO_ORDER_IDS["1004"], customerId: "USR-001", document: "Literatur penelitian.pdf", amount: 10000, payment: "Berhasil", processing: "Gagal", delivery: "Belum dikirim", failureReason: "timeout", note: "Layanan GPTZero tidak merespons dalam batas waktu (skenario demo). Hasil belum tersedia. Periksa kondisi layanan sebelum mencoba ulang.", date: "2026-10-07" }, { id: DEMO_ORDER_IDS["1005"], customerId: "USR-001", document: "Esai akademik.pdf", amount: 10000, payment: "Berhasil", processing: "Selesai", delivery: "Terkirim", note: "Masa unduh 24 jam telah berakhir. Dokumen dan laporan tidak lagi tersedia.", completedAt: stamp(26), date: "2026-10-07" }, { id: DEMO_ORDER_IDS["1006"], customerId: "USR-003", document: "Tinjauan pustaka.docx", amount: 10000, payment: "Berhasil", processing: "Antre", delivery: "Belum dikirim", failureReason: "rate_limit", note: "Batas request GPTZero sementara tercapai (skenario demo). Tetap di antrean untuk dicoba ulang setelah jeda; masa unduh belum dimulai.", date: "2026-10-09" }],
     plans: [{ id: "starter", name: "Starter", price: 45000, quota: 5, active: true }, { id: "standart", name: "Standart", price: 85000, quota: 10, active: true }, { id: "premium", name: "Premium", price: 165000, quota: 25, active: true }],
     blogs: [{ id: "BLOG-001", title: "Menyusun referensi akademik dengan lebih mudah", slug: "menyusun-referensi-akademik", category: "Tutorial", summary: "Langkah sederhana untuk mengelola sumber tulisanmu.", content: "Mulai dengan mencatat sumber yang digunakan. Periksa penulis, tahun, judul, dan DOI sebelum menyusun daftar pustaka.", status: "Draft", author: "Tim Gleans", coverId: "", coverAlt: "", featured: false }, { id: "BLOG-002", title: "Persiapan dokumen sebelum pemeriksaan", slug: "persiapan-dokumen", category: "Tips & Trik", summary: "Pastikan dokumen siap diperiksa.", content: "Periksa format dan kelengkapan dokumen sebelum mengirim pesanan.", status: "Terbit", author: "Tim Gleans", coverId: "", coverAlt: "", featured: true }],
     promos: [{ id: "PROMO-001", name: "Promo mahasiswa Oktober", title: "Mulai tulisanmu bersama Gleans", type: "Banner", code: "", discount: 0, start: "2026-10-01", end: "2026-10-31", active: true }, { id: "PROMO-002", name: "Kode sambutan", title: "Diskon pemeriksaan pertama", type: "Kode promo", code: "GLEANSBARU", discount: 2000, start: "2026-10-01", end: "2026-10-31", active: false }],
@@ -57,15 +65,37 @@ export function inviteDemoAdmin(state:AdminState,member:{name:string;email:strin
  return adminSchema.parse({...state,admins:existing?state.admins.map(a=>a.id===existing.id?parsed:a):[...state.admins,parsed],activity:[{id:crypto.randomUUID(),action:"Membuat undangan demo",actor:"Gleans",object:parsed.email,at:new Date().toISOString()},...state.activity].slice(0,100)});
 }
 
+export function normalizeAdminOrderId(id: string): string {
+  return id.replace(/^(?:SH|DEMO|GLS)-([^:]+)(?=:|$)/, (_match, suffix: string) => {
+    if (/^[0-9A-F]{12}$/i.test(suffix)) return `GLS-${suffix.toUpperCase()}`;
+    if (Object.prototype.hasOwnProperty.call(DEMO_ORDER_IDS, suffix)) return DEMO_ORDER_IDS[suffix];
+    // Stable conversion for legacy demo IDs; this is not an access token.
+    let first = 0x811c9dc5;
+    let second = 0x9e3779b9;
+    for (const character of suffix) {
+      first = Math.imul(first ^ character.charCodeAt(0), 0x01000193);
+      second = Math.imul(second ^ character.charCodeAt(0), 0x85ebca6b);
+    }
+    const code = (first >>> 0).toString(16).padStart(8, "0") + (second >>> 0).toString(16).padStart(8, "0");
+    return `GLS-${code.slice(0, 12).toUpperCase()}`;
+  });
+}
+
 export function upgradeAdminDemo(state: AdminState): AdminState {
-  if (state.demoVersion >= 3) return state;
+  if (state.demoVersion >= 5) return state;
+  const orderIds = new Map(state.orders.map(order => [order.id, normalizeAdminOrderId(order.id)]));
+  const orders = state.orders.map(order => ({ ...order, id: orderIds.get(order.id)! }));
+  const migrated = { ...state, demoVersion: 5, orders,
+    activity: state.activity.map(item => ({ ...item, object: orderIds.get(item.object) ?? item.object })),
+  };
+  if (state.demoVersion >= 3) return adminSchema.parse(migrated);
   const samples = initialAdmin();
-  return adminSchema.parse({ ...state, demoVersion: 3, orders: [
-    ...state.orders.map(order => ({ ...order,
-      ...(order.processing === "Selesai" && !order.completedAt ? { completedAt: order.id === "SH-1002" ? samples.orders.find(o => o.id === order.id)!.completedAt : `${order.date}T08:00:00.000Z` } : {}),
-      ...(order.id === "SH-1004" && order.processing === "Gagal" ? { failureReason: "timeout", note: samples.orders.find(o => o.id === order.id)!.note } : {}),
+  return adminSchema.parse({ ...migrated, orders: [
+    ...orders.map(order => ({ ...order,
+      ...(order.processing === "Selesai" && !order.completedAt ? { completedAt: order.id === DEMO_ORDER_IDS["1002"] ? samples.orders.find(o => o.id === order.id)!.completedAt : `${order.date}T08:00:00.000Z` } : {}),
+      ...(order.id === DEMO_ORDER_IDS["1004"] && order.processing === "Gagal" ? { failureReason: "timeout", note: samples.orders.find(o => o.id === order.id)!.note } : {}),
     })),
-    ...samples.orders.filter(o => ["SH-1005", "SH-1006"].includes(o.id) && !state.orders.some(old => old.id === o.id)),
+    ...samples.orders.filter(o => [DEMO_ORDER_IDS["1005"], DEMO_ORDER_IDS["1006"]].includes(o.id) && !orders.some(old => old.id === o.id)),
   ] });
 }
 

@@ -9,7 +9,7 @@ export function Hero() {
       <div className="flex w-full max-w-[681px] flex-col items-center gap-6 text-center lg:items-start lg:text-left">
         <div className="flex flex-col items-center gap-4 lg:items-start">
           <p className="flex items-center gap-2 text-sm tracking-wide uppercase">
-            <Image src="/images/cup.png" alt="" width={20} height={20} className="size-5" />
+            <Image src="/images/cup.svg" alt="" width={20} height={20} className="size-5" />
             All in one student platform
           </p>
           <h1 className="text-[40px] leading-[1.15] font-medium tracking-tight md:text-5xl lg:text-[68px] lg:leading-[1.2]">

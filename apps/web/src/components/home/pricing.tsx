@@ -1,12 +1,17 @@
 import Link from "next/link";
-import { CircleCheck } from "lucide-react";
-import { FeatureMark } from "@/components/brand/logo";
+import { CircleCheck, Files, FileText, Layers } from "lucide-react";
 import { SectionHeading } from "@/components/layout/section-heading";
 import { Button } from "@gleans/ui/button";
 import { formatRupiah } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import { PLANS } from "@/lib/plans";
+
+const PLAN_ICONS = {
+  starter: FileText,
+  standart: Files,
+  premium: Layers,
+};
 
 export function Pricing() {
   return (
@@ -17,44 +22,50 @@ export function Pricing() {
           description="Lebih hemat cek plagiarisme, dari tugas hingga skripsi."
         />
         <div className="flex flex-col gap-4 md:grid md:grid-cols-2 lg:grid-cols-3">
-          {PLANS.map((plan, i) => (
-            <article
-              key={plan.id}
-              className={cn(
-                "flex w-full flex-col justify-between gap-10 rounded-[24px] border bg-white p-4 md:w-auto lg:min-h-[475px] lg:gap-[59px]",
-                i === 2 && "md:col-span-2 lg:col-span-1",
-              )}
-            >
-              <div className="flex flex-col gap-8">
-                <div className="flex items-center justify-between gap-8">
-                  <FeatureMark />
-                  <div className="flex flex-col items-end gap-1 text-right">
-                    <p className="text-2xl font-semibold">{formatRupiah(plan.price)}</p>
-                    <p className="text-muted-foreground line-through">{formatRupiah(plan.normal)}</p>
+          {PLANS.map((plan, i) => {
+            const PlanIcon = PLAN_ICONS[plan.id];
+
+            return (
+              <article
+                key={plan.id}
+                className={cn(
+                  "flex w-full flex-col justify-between gap-10 rounded-[24px] border bg-white p-4 md:w-auto lg:min-h-[475px] lg:gap-[59px]",
+                  i === 2 && "md:col-span-2 lg:col-span-1",
+                )}
+              >
+                <div className="flex flex-col gap-8">
+                  <div className="flex items-center justify-between gap-8">
+                    <span className="flex size-12 shrink-0 items-center justify-center rounded-[16px] bg-primary text-white">
+                      <PlanIcon aria-hidden="true" className="size-6" />
+                    </span>
+                    <div className="flex flex-col items-end gap-1 text-right">
+                      <p className="text-2xl font-semibold">{formatRupiah(plan.price)}</p>
+                      <p className="text-muted-foreground line-through">{formatRupiah(plan.normal)}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-6">
+                    <div className="flex flex-col gap-2">
+                      <h3 className="text-[22px] font-semibold">{plan.name}</h3>
+                      <p>{plan.blurb}</p>
+                    </div>
+                    <ul className="flex flex-col gap-3">
+                      {[`${plan.checks}x Cek Plagiarisme`, "Dapatkan prioritas pelayanan", "Notifikasi Whatsapp"].map(
+                        (f) => (
+                          <li key={f} className="flex items-center gap-2">
+                            <CircleCheck className="size-6 shrink-0 fill-primary text-white" />
+                            {f}
+                          </li>
+                        ),
+                      )}
+                    </ul>
                   </div>
                 </div>
-                <div className="flex flex-col gap-6">
-                  <div className="flex flex-col gap-2">
-                    <h3 className="text-[22px] font-semibold">{plan.name}</h3>
-                    <p>{plan.blurb}</p>
-                  </div>
-                  <ul className="flex flex-col gap-3">
-                    {[`${plan.checks}x Cek Plagiarisme`, "Dapatkan prioritas pelayanan", "Notifikasi Whatsapp"].map(
-                      (f) => (
-                        <li key={f} className="flex items-center gap-2">
-                          <CircleCheck className="size-6 shrink-0 fill-primary text-white" />
-                          {f}
-                        </li>
-                      ),
-                    )}
-                  </ul>
-                </div>
-              </div>
-              <Button asChild size="pill" className="w-full font-normal">
-                <Link href={`/daftar?paket=${plan.id}`}>Bayar Sekarang</Link>
-              </Button>
-            </article>
-          ))}
+                <Button asChild size="pill" className="w-full font-normal">
+                  <Link href={`/daftar?paket=${plan.id}`}>Bayar Sekarang</Link>
+                </Button>
+              </article>
+            );
+          })}
         </div>
       </div>
     </section>

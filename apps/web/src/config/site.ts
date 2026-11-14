@@ -51,4 +51,6 @@ export const CONTACT = {
   email: "team@gleans.my.id",
   instagram: "@gleans.id",
   instagramUrl: "https://instagram.com/gleans.id",
+  tiktok: "@gleans.id",
+  tiktokUrl: "https://www.tiktok.com/@gleans.id",
 };

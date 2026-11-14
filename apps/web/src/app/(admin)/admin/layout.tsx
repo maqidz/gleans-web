@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { currentUser } from "@/features/auth/server";
 import { isAdmin } from "@/features/auth/session";
 import { AdminShell } from "@/features/admin/components/shell";
-export const metadata: Metadata = { title: "Admin Demo", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Admin", robots: { index: false, follow: false } };
 export default async function Layout({ children }: { children: React.ReactNode }) {
   const user = await currentUser();
   if (!user) redirect("/masuk");

@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowUpRight, Eye, Search } from "lucide-react";
+import { ArrowUpRight, CircleAlert, ClipboardList, Clock3, Eye, FileText, Search, StickyNote, UserRound, X, type LucideIcon } from "lucide-react";
 import { Button } from "@gleans/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@gleans/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@gleans/ui/dialog";
 import { formatRupiah } from "@/lib/format";
 import { normalizeAdminOrderId, type AdminState } from "@/features/admin/lib/model";
 import { useAdmin } from "./provider";
@@ -94,14 +94,14 @@ export function AdminRecordsTable({ module }: { module: "pesanan" | "pelanggan" 
   ];
 
   return <>
-    <div className="mb-7"><h1 className="text-2xl font-semibold sm:text-3xl">{title}</h1><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{isOrder ? "Pantau pembayaran, pemeriksaan, dan pengiriman laporan. Buka detail untuk melihat informasi pesanan." : "Lihat profil, saldo, kuota, dan riwayat pesanan pelanggan."}</p></div>
+    <div className="mb-7"><h1 className="text-2xl font-semibold sm:text-3xl">{isOrder ? "Contoh pesanan" : title}</h1><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{isOrder ? "Data demo untuk melihat contoh status. Proses pesanan asli melalui bagian Pesanan Shield di atas." : "Lihat profil, saldo, kuota, dan riwayat pesanan pelanggan."}</p></div>
     <div className="mb-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{metrics.map(([label, value]) => <section key={label} className={card}><p className="text-xs text-muted-foreground">{label}</p><p className="mt-4 break-words text-2xl font-semibold">{value}</p></section>)}</div>
     <div className="min-w-0 w-full">
       <div className="mb-5 grid gap-3">
         <div className={`flex ${isOrder ? "h-10" : "h-11"} min-w-0 items-center gap-2 rounded-xl bg-surface px-4`}><Search className="size-4 shrink-0 text-muted-foreground"/><input aria-label={`Cari ${title}`} placeholder={isOrder ? "Cari ID, dokumen, nama, atau WhatsApp…" : "Cari nama, email, ID, atau WhatsApp…"} value={query} onChange={e => setQuery(e.target.value)} className="w-full min-w-0 bg-transparent text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary"/></div>
         {isOrder && <div className="grid gap-3 sm:grid-cols-3">
           <select aria-label="Filter pembayaran" value={payment} onChange={e => setPayment(e.target.value)} className={control}><option value="Semua">Semua pembayaran</option>{["Menunggu", "Berhasil", "Kedaluwarsa", "Refund"].map(x => <option key={x}>{x}</option>)}</select>
-          <select aria-label="Filter pemeriksaan" value={processing} onChange={e => setProcessing(e.target.value)} className={control}><option value="Semua">Semua pemeriksaan</option><option value="Berjalan">Antre & diproses</option><option value="Retry">Menunggu retry</option>{["Belum diproses", "Antre", "Diproses", "Selesai", "Gagal"].map(x => <option key={x}>{x}</option>)}</select>
+          <select aria-label="Filter pemeriksaan" value={processing} onChange={e => setProcessing(e.target.value)} className={control}><option value="Semua">Semua pemeriksaan</option><option value="Berjalan">Antre & diproses</option><option value="Retry">Perlu tindak lanjut</option>{["Belum diproses", "Antre", "Diproses", "Selesai", "Gagal"].map(x => <option key={x}>{x}</option>)}</select>
           <select aria-label="Filter laporan" value={delivery} onChange={e => setDelivery(e.target.value)} className={control}><option value="Semua">Semua laporan</option>{["Belum dikirim", "Terkirim", "Gagal dikirim"].map(x => <option key={x}>{x}</option>)}</select>
         </div>}
         {isOrder && <label className="flex items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={attention} onChange={e => setAttention(e.target.checked)}/>Hanya yang perlu tindakan</label>}
@@ -117,34 +117,56 @@ export function AdminRecordsTable({ module }: { module: "pesanan" | "pelanggan" 
               <td className={cell}><p className="font-medium">{c?.name || o.customerId}</p><p className="mt-1 whitespace-nowrap text-xs text-muted-foreground">{c?.whatsapp || "—"}</p></td>
               <td className={cell+" max-w-64 break-words"}>{o.document}{o.processing === "Selesai" && <Retention order={o} now={now}/>}</td><td className={cell+" whitespace-nowrap"}>{formatRupiah(o.amount)}</td>
               <td className={cell}><Status value={o.payment}/></td><td className={cell}><Status value={o.processing}/></td><td className={cell}><Status value={o.delivery}/></td>
-              <td className={cell+" sticky right-0 bg-white"}><Button variant="ghost" size="pill-sm" aria-label={`Detail pesanan ${o.id}`} onClick={() => setSelected(o.id)}><Eye className="size-4"/>Detail</Button></td>
+              <td className={cell+" sticky right-0 bg-white"}><Button variant="outline" size="icon" className="rounded-[10px] shadow-none" aria-label={`Detail pesanan ${o.id}`} onClick={() => setSelected(o.id)}><Eye className="size-4"/></Button></td>
             </tr>;}) : customers.map(c => <tr key={c.id} className="hover:bg-surface/50">
               <td className={cell}><p className="font-medium">{c.name}</p><p className="mt-1 text-xs text-muted-foreground">{c.id}</p></td>
               <td className={cell}><p>{c.email}</p><p className="mt-1 text-xs text-muted-foreground">{c.whatsapp || "—"}</p></td>
               <td className={cell+" whitespace-nowrap"}>{formatRupiah(c.balance)}</td><td className={cell}>{c.quota}</td><td className={cell}>{state.orders.filter(o => o.customerId === c.id).length}</td>
-              <td className={cell+" sticky right-0 border-l bg-white"}><Button variant="ghost" size="pill-sm" aria-label={`Detail pelanggan ${c.name}`} onClick={() => setSelected(c.id)}><Eye className="size-4"/>Detail</Button></td>
+              <td className={cell+" sticky right-0 border-l bg-white"}><Button variant="outline" size="icon" className="rounded-[10px] shadow-none" aria-label={`Detail pelanggan ${c.name}`} onClick={() => setSelected(c.id)}><Eye className="size-4"/></Button></td>
             </tr>)}
             {!count && <tr><td colSpan={isOrder ? 8 : 6} className="px-4 py-12 text-center text-muted-foreground">Tidak ada hasil. Coba kata kunci atau filter lain.</td></tr>}
           </tbody>
         </table>
       </div>
     </div>
-    <Dialog open={!!selected} onOpenChange={v => {if (!v) close();}}><DialogContent className="max-h-[85dvh] overflow-y-auto rounded-[24px] sm:max-w-2xl">
-      <DialogHeader><DialogTitle>{isOrder ? "Detail pesanan" : "Detail pelanggan"}</DialogTitle><DialogDescription>Informasi demo untuk dilihat.</DialogDescription></DialogHeader>
-      {isOrder && order ? <OrderDetail order={order} customer={customer} now={now}/> : !isOrder && customer ? <CustomerDetail customer={customer} orders={state.orders.filter(o => o.customerId === customer.id)}/> : <p className="py-6 text-sm text-muted-foreground">Data tidak ditemukan.</p>}
-      <div className="flex justify-end border-t pt-4"><Button variant="outline" size="pill-sm" onClick={close}>Tutup</Button></div>
+    <Dialog open={!!selected} onOpenChange={v => {if (!v) close();}}><DialogContent showCloseButton={!isOrder} className={isOrder ? "flex max-h-[min(82dvh,720px)] max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden rounded-[28px] p-0 sm:max-w-[640px]" : "max-h-[85dvh] overflow-y-auto rounded-[24px] sm:max-w-2xl"}>
+      <DialogHeader className={isOrder ? "shrink-0 px-5 pt-5 pb-4 sm:px-6 sm:pt-6" : undefined}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0"><DialogTitle className={isOrder ? "text-xl leading-tight sm:text-2xl" : undefined}>{isOrder ? "Detail pesanan" : "Detail pelanggan"}</DialogTitle><DialogDescription className={isOrder ? "mt-1.5 text-sm" : "mt-2"}>{isOrder ? "Informasi pesanan dan status pemeriksaan." : "Informasi demo untuk dilihat."}</DialogDescription></div>
+          {isOrder && <DialogClose asChild><Button variant="ghost" size="icon-sm" className="shrink-0 rounded-full text-muted-foreground" aria-label="Tutup detail pesanan"><X className="size-4"/></Button></DialogClose>}
+        </div>
+      </DialogHeader>
+      <div className={isOrder ? "min-h-0 overflow-y-auto overscroll-contain px-5 sm:px-6" : undefined}>
+        {isOrder && order ? <OrderDetail order={order} customer={customer} now={now}/> : !isOrder && customer ? <CustomerDetail customer={customer} orders={state.orders.filter(o => o.customerId === customer.id)}/> : <p className="py-6 text-sm text-muted-foreground">Data tidak ditemukan.</p>}
+      </div>
+      <div className={isOrder ? "flex shrink-0 justify-end px-5 py-4 sm:px-6 sm:pb-6" : "flex justify-end border-t pt-4"}><Button variant="outline" size="pill-sm" className="rounded-full shadow-none" onClick={close}>Tutup</Button></div>
     </DialogContent></Dialog>
   </>;
 }
 
+function DetailCard({ title, icon: Icon, children }: { title: string; icon: LucideIcon; children: React.ReactNode }) {
+  return <section className="rounded-[18px] border border-border bg-white p-4 sm:p-5">
+    <div className="mb-4 flex items-center gap-3"><span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600"><Icon className="size-4"/></span><h3 className="text-sm font-medium sm:text-base">{title}</h3></div>
+    {children}
+  </section>;
+}
+
 function OrderDetail({ order, customer, now }: { order: Order; customer?: Customer; now: number }) {
-  return <div className="space-y-6">
-    <section className="rounded-2xl bg-surface p-4"><p className="text-xs text-muted-foreground">{order.id} · {date(order.date)}</p><h3 className="mt-2 break-words font-semibold">{order.document}</h3><p className="mt-3 text-xl font-semibold">{formatRupiah(order.amount)}</p></section>
-    <dl className="grid gap-5 sm:grid-cols-2"><DetailItem label="Pelanggan">{customer?.name || order.customerId}</DetailItem><DetailItem label="ID pelanggan">{order.customerId}</DetailItem><DetailItem label="Email">{customer?.email || "—"}</DetailItem><DetailItem label="WhatsApp">{customer?.whatsapp || "—"}</DetailItem></dl>
-    <dl className="grid gap-5 rounded-2xl border p-4 sm:grid-cols-3"><DetailItem label="Pembayaran"><Status value={order.payment}/></DetailItem><DetailItem label="Pemeriksaan"><Status value={order.processing}/></DetailItem><DetailItem label="Pengiriman laporan"><Status value={order.delivery}/></DetailItem></dl>
-    {order.processing === "Selesai" && <section className="rounded-2xl bg-surface p-4"><h3 className="text-sm font-medium">Akses dokumen dan laporan</h3><Retention order={order} now={now} detail/></section>}
-    {order.failureReason && <section className="rounded-2xl bg-amber-50 p-4"><h3 className="text-sm font-medium">{order.failureReason === "rate_limit" ? "Menunggu layanan tersedia" : "Penyebab kegagalan"}</h3><p className="mt-2 text-sm">{failureLabels[order.failureReason]}</p></section>}
-    <dl><DetailItem label="Catatan operator"><span className="whitespace-pre-wrap">{order.note || "Belum ada catatan."}</span></DetailItem></dl>
+  return <div className="space-y-3">
+    <section className="rounded-[18px] border border-border bg-white p-4 sm:p-5">
+      <div className="flex items-start gap-3">
+        <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600"><FileText className="size-4"/></span>
+        <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="min-w-0"><h3 className="break-words text-base font-medium leading-relaxed">{order.document}</h3><p className="mt-1 break-all text-xs text-muted-foreground">{order.id}</p><p className="mt-1 text-xs text-muted-foreground">{date(order.date)}</p></div>
+          <p className="justify-self-end whitespace-nowrap text-right text-xl font-semibold">{formatRupiah(order.amount)}</p>
+        </div>
+      </div>
+    </section>
+    <DetailCard title="Pelanggan" icon={UserRound}><dl className="grid grid-cols-1 gap-4 sm:grid-cols-2"><DetailItem label="Nama">{customer?.name || order.customerId}</DetailItem><DetailItem label="ID pelanggan">{order.customerId}</DetailItem><DetailItem label="Email">{customer?.email || "—"}</DetailItem><DetailItem label="WhatsApp">{customer?.whatsapp || "—"}</DetailItem></dl></DetailCard>
+    <DetailCard title="Status pesanan" icon={ClipboardList}><dl className="grid grid-cols-1 gap-4 min-[400px]:grid-cols-3"><DetailItem label="Pembayaran"><Status value={order.payment}/></DetailItem><DetailItem label="Pemeriksaan"><Status value={order.processing}/></DetailItem><DetailItem label="Status laporan"><Status value={order.delivery}/></DetailItem></dl></DetailCard>
+    {order.processing === "Selesai" && <DetailCard title="Akses dokumen dan laporan" icon={Clock3}><Retention order={order} now={now} detail/></DetailCard>}
+    {order.failureReason && <DetailCard title={order.failureReason === "rate_limit" ? "Menunggu pemeriksaan admin" : "Penyebab kegagalan"} icon={CircleAlert}><p className="text-sm leading-relaxed text-muted-foreground">{failureLabels[order.failureReason]}</p></DetailCard>}
+    <DetailCard title="Catatan operator" icon={StickyNote}><p className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${order.note ? "" : "text-muted-foreground"}`}>{order.note || "Belum ada catatan."}</p></DetailCard>
   </div>;
 }
 
@@ -156,7 +178,7 @@ function CustomerDetail({ customer, orders }: { customer: Customer; orders: Orde
   </div>;
 }
 
-const failureLabels = { api_quota: "Kuota API GPTZero habis · skenario demo", rate_limit: "Batas request GPTZero sementara tercapai · menunggu percobaan ulang", timeout: "Layanan pemeriksaan tidak merespons", invalid_document: "Dokumen tidak dapat dibaca" };
+const failureLabels = { api_quota: "Akses GPTZero perlu diperiksa oleh admin", rate_limit: "Menunggu pemeriksaan manual oleh admin", timeout: "Pemeriksaan manual belum berhasil diselesaikan", invalid_document: "Dokumen tidak dapat dibaca" };
 function Retention({ order, now, detail = false }: { order: Order; now: number; detail?: boolean }) {
   if (!now) return null;
   const access = shieldAccess(order.completedAt, now);

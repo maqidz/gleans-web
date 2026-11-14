@@ -79,7 +79,7 @@ export function Testimonials() {
         <div className="container-page">
           <SectionHeading
             title="Kata mereka tentang Gleans"
-            description="Gleans hadir untuk mendukung setiap kebutuhan penulisan akademikmu."
+            description="Cerita mahasiswa saat mengerjakan tugas kuliah."
           />
         </div>
         <div className="container-page flex flex-col gap-4 md:hidden">

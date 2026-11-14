@@ -25,7 +25,7 @@ export function Advantages() {
       <div className="container-page flex flex-col gap-10 md:gap-14 lg:gap-20">
         <SectionHeading
           title="Kenapa memilih Gleans?"
-          description="Gleans hadir untuk mendukung setiap kebutuhan penulisan akademikmu."
+          description="Periksa dokumen akademik dengan biaya terjangkau dan privasi yang terjaga."
         />
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {ITEMS.map(({ icon, title, body }, i) => (

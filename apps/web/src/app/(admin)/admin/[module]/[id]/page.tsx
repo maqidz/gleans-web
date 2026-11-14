@@ -1,3 +1,3 @@
 import { notFound } from "next/navigation";
-import { AdminBlogEditor } from "@/features/admin/components/blog-editor";
-export default async function Page({params}:{params:Promise<{module:string;id:string}>}) {const {module,id}=await params;if(module!=="blog")notFound();return <AdminBlogEditor id={id}/>;}
+import { AdminUnavailable } from "@/features/admin/components/unavailable";
+export default async function Page({params}:{params:Promise<{module:string;id:string}>}) {const {module}=await params;if(module!=="blog")notFound();return <AdminUnavailable title="Blog"/>;}

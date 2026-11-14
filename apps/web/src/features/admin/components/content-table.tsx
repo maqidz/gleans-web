@@ -54,7 +54,7 @@ export function AdminContentTable({ module, items, onEdit, onPreview, onToggle }
             {promo && <><td className={cell+" whitespace-nowrap"}>{promo.type}</td><td className={cell+" whitespace-nowrap text-xs leading-6"}>{day(promo.start)}<br/><span className="text-muted-foreground">s.d. {day(promo.end)}</span></td></>}
             <td className={cell}><Badge active={status === "Terbit" || status === "Aktif"}>{status}</Badge></td>
             <td className={cell}><Toggle label={isBlog ? `Artikel unggulan ${title}` : `Aktifkan promosi ${title}`} checked={blog ? blog.featured : !!promo?.active} onChange={() => onToggle(item)}/></td>
-            <td className={cell+" sticky right-0 border-l bg-white"}><div className="flex items-center gap-1"><Button variant="ghost" size="icon" aria-label={`Preview ${title}`} onClick={() => onPreview(item)}><Eye className="size-4"/></Button><Button variant="ghost" size="icon" aria-label={`Kelola ${title}`} onClick={() => onEdit(item)}><Pencil className="size-4"/></Button></div></td>
+            <td className={cell+" sticky right-0 border-l bg-white"}><div className="flex items-center gap-2"><Button variant="outline" size="icon" className="rounded-[10px] shadow-none" aria-label={`Preview ${title}`} onClick={() => onPreview(item)}><Eye className="size-4"/></Button><Button variant="outline" size="icon" className="rounded-[10px] shadow-none" aria-label={`Kelola ${title}`} onClick={() => onEdit(item)}><Pencil className="size-4"/></Button></div></td>
           </tr>;
         })}{!items.length && <tr><td colSpan={columns.length} className="px-4 py-12 text-center text-muted-foreground">Tidak ada hasil. Coba kata kunci atau filter lain.</td></tr>}</tbody>
       </table>

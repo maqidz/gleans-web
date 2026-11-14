@@ -5,34 +5,72 @@ import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
 import { toast } from "sonner";
 import { DropdownMenuCheckboxItem } from "@gleans/ui/dropdown-menu";
+import { Button } from "@gleans/ui/button";
 import { createOrderWatcher, ORDER_ARRIVED_EVENT, type OrderMarker } from "../lib/order-alerts";
 
-// A brief "de-ring": a short pickup followed by a brighter, fading bell.
-function chime(context: AudioContext) {
-  if (context.state !== "running") throw new Error("AUDIO_SUSPENDED");
-  const now = context.currentTime;
-  const notes = [
-    { frequency: 783.99, offset: 0, duration: 0.2, volume: 0.13 },
-    { frequency: 1046.5, offset: 0.14, duration: 0.95, volume: 0.16 },
-  ];
-  notes.forEach(note => {
-    [1, 2, 2.997].forEach((partial, index) => {
-      const oscillator = context.createOscillator();
-      const gain = context.createGain();
-      const start = now + note.offset;
-      const duration = note.duration / (1 + index * 0.65);
-      oscillator.type = "sine";
-      oscillator.frequency.value = note.frequency * partial;
-      gain.gain.setValueAtTime(0, start);
-      gain.gain.linearRampToValueAtTime(note.volume / (1 + index * 4), start + 0.006);
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-      oscillator.connect(gain);
-      gain.connect(context.destination);
-      oscillator.start(start);
-      oscillator.stop(start + duration + 0.02);
-      oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
-    });
-  });
+function createNotificationSound() {
+  const context = new AudioContext();
+  let output: GainNode | null = null;
+  let sources: AudioScheduledSourceNode[] = [];
+  let generation = 0;
+
+  function stop() {
+    generation += 1;
+    output?.disconnect();
+    output = null;
+    for (const source of sources) source.stop();
+    sources = [];
+  }
+
+  return {
+    stop,
+    async play() {
+      stop();
+      const current = generation;
+      await context.resume();
+      if (current !== generation) return false;
+
+      const master = context.createGain();
+      master.gain.value = 0.55;
+      master.connect(context.destination);
+      output = master;
+      const start = context.currentTime + 0.015;
+
+      // Three rising bell notes, each with a finite, fading tail.
+      [1046.5, 1318.51, 1567.98].forEach((frequency, index) => {
+        const at = start + index * 0.13;
+        [[1, 0.22], [2.76, 0.035], [5.4, 0.008]].forEach(([ratio, volume]) => {
+          const oscillator = context.createOscillator();
+          const envelope = context.createGain();
+          oscillator.type = "sine";
+          oscillator.frequency.setValueAtTime(frequency * ratio, at);
+          envelope.gain.setValueAtTime(0, at);
+          envelope.gain.linearRampToValueAtTime(volume, at + 0.008);
+          envelope.gain.exponentialRampToValueAtTime(0.0001, at + 0.7);
+          envelope.gain.linearRampToValueAtTime(0, at + 0.74);
+          oscillator.connect(envelope);
+          envelope.connect(master);
+          sources.push(oscillator);
+          oscillator.onended = () => {
+            oscillator.disconnect();
+            envelope.disconnect();
+            sources = sources.filter(source => source !== oscillator);
+            if (!sources.length) {
+              master.disconnect();
+              if (output === master) output = null;
+            }
+          };
+          oscillator.start(at);
+          oscillator.stop(at + 0.75);
+        });
+      });
+      return true;
+    },
+    dispose() {
+      stop();
+      void context.close();
+    },
+  };
 }
 
 const NotificationContext = createContext<{
@@ -42,9 +80,17 @@ const NotificationContext = createContext<{
   toggle: () => void;
 } | null>(null);
 
+function showOrderNotification(id: string, openOrders: () => void) {
+  const toastId = toast.info("Pesanan QRIS baru masuk", {
+    description: id,
+    duration: 8_000,
+    action: <Button variant="outline" size="pill-sm" className="rounded-full border-border bg-background px-3 text-foreground shadow-none" onClick={() => { toast.dismiss(toastId); openOrders(); }}>Lihat pesanan</Button>,
+  });
+}
+
 export function AdminOrderAlertsProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const audio = useRef<AudioContext | null>(null);
+  const audio = useRef<ReturnType<typeof createNotificationSound> | null>(null);
   const enabled = useRef(false);
   const [sound, setSound] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -77,18 +123,13 @@ export function AdminOrderAlertsProvider({ children }: { children: ReactNode }) 
         setConnectionError("");
         if (observe(latest)) {
           window.dispatchEvent(new Event(ORDER_ARRIVED_EVENT));
-          if (enabled.current) toast.info("Pesanan QRIS baru masuk", {
-              description: latest!.id,
-              duration: 8_000,
-              action: { label: "Lihat pesanan", onClick: () => router.push("/admin/pesanan") },
-            });
+          if (enabled.current) showOrderNotification(latest!.id, () => router.push("/admin/pesanan"));
           if (enabled.current && audio.current) {
-            try { chime(audio.current); }
-            catch {
+            void audio.current.play().catch(() => {
               enabled.current = false;
               setSound(false);
               setMessage("Aktifkan kembali notifikasi untuk mengizinkan suara.");
-            }
+            });
           }
         }
       } catch {
@@ -114,19 +155,20 @@ export function AdminOrderAlertsProvider({ children }: { children: ReactNode }) 
     };
   }, [router]);
 
-  useEffect(() => () => {
-    enabled.current = false;
-    if (audio.current && audio.current.state !== "closed") void audio.current.close();
-    audio.current = null;
+  useEffect(() => {
+    return () => {
+      enabled.current = false;
+      audio.current?.dispose();
+      audio.current = null;
+    };
   }, []);
 
   async function play() {
     setBusy(true);
     setMessage("");
     try {
-      if (!audio.current || audio.current.state === "closed") audio.current = new AudioContext();
-      await audio.current.resume();
-      chime(audio.current);
+      audio.current ??= createNotificationSound();
+      if (!await audio.current.play()) return;
       enabled.current = true;
       setSound(true);
     } catch {
@@ -141,7 +183,7 @@ export function AdminOrderAlertsProvider({ children }: { children: ReactNode }) 
     busy,
     error: message || connectionError,
     toggle: () => {
-      if (sound) { enabled.current = false; setSound(false); setMessage(""); }
+      if (sound) { enabled.current = false; audio.current?.stop(); setSound(false); setMessage(""); }
       else void play();
     },
   }}>{children}</NotificationContext.Provider>;

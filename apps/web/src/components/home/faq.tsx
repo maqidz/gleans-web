@@ -33,7 +33,7 @@ export function Faq() {
       <div className="container-page flex flex-col gap-10 md:gap-14 lg:gap-[60px]">
         <SectionHeading
           title="Pertanyaan yang sering diajukan"
-          description="Gleans hadir untuk mendukung setiap kebutuhan penulisan akademikmu."
+          description="Kenali fitur dan cara pakai Gleans."
         />
         <AccordionPrimitive.Root type="single" collapsible defaultValue="0" className="flex flex-col gap-4">
           {FAQS.map((f, i) => (

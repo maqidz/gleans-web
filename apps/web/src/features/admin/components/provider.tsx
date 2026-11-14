@@ -1,14 +1,22 @@
 "use client";
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { toast } from "sonner";
-import { ADMIN_STORAGE_KEY, adminSchema, initialAdmin, upgradeAdminDemo, inviteDemoAdmin, revokeDemoAdmin, saveAdminRecord, type AdminState, type Collection, type RecordData } from "@/features/admin/lib/model";
-const Context = createContext<{ state: AdminState; adminEmail: string; ready: boolean; error: string; save: (collection: Collection, record: RecordData, reason?: string) => void; configure: (settings: AdminState["settings"]) => void; invite: (member:{name:string;email:string;role:"Editor"|"Operator"})=>void; log:(action:string,object:string)=>void; revoke:(id:string)=>void; clearActivity:()=>void; reset: () => void } | null>(null);
+import { createContext, useContext, useEffect, useCallback, useState, type ReactNode } from "react";
+import { type AdminState, type Collection, type RecordData } from "@/features/admin/lib/model";
+import { emptyAdminState } from "../lib/live-data";
+import { ORDER_ARRIVED_EVENT } from "../lib/order-alerts";
+const Context = createContext<{ state: AdminState; adminEmail: string; ready: boolean; error: string; limited: boolean; refresh: () => Promise<void>; save: (collection: Collection, record: RecordData, reason?: string) => void; configure: (settings: AdminState["settings"]) => void; invite: (member:{name:string;email:string;role:"Editor"|"Operator"})=>void; log:(action:string,object:string)=>void; revoke:(id:string)=>void; clearActivity:()=>void; reset: () => void } | null>(null);
+function unavailable(): never { throw new Error("Fitur ini belum terhubung ke server. Tidak ada perubahan yang disimpan."); }
 export function AdminProvider({children,email}:{children:ReactNode;email:string}) {
-  const [state,setState]=useState(initialAdmin); const [ready,setReady]=useState(false); const [error,setError]=useState("");
-  useEffect(()=>{try { const raw=localStorage.getItem(ADMIN_STORAGE_KEY); if(raw) setState(upgradeAdminDemo(adminSchema.parse(JSON.parse(raw)))); } catch {setError("Data demo tidak dapat dipulihkan. Data contoh digunakan.");} setReady(true);},[]);
-  useEffect(()=>{if(!ready)return;try{localStorage.setItem(ADMIN_STORAGE_KEY,JSON.stringify(state));}catch{setError("Penyimpanan browser tidak tersedia. Perubahan hanya berlaku selama halaman ini terbuka.");}},[state,ready]);
-  function save(collection:Collection,record:RecordData,reason="") {const next=saveAdminRecord(state,collection,record,reason);setState(next);toast.success("Perubahan demo disimpan.");}
-  function configure(settings:AdminState["settings"]) {const parsed=adminSchema.shape.settings.parse(settings);if(parsed.maxWords<parsed.minWords)throw new Error("Batas maksimal kata harus lebih besar dari batas minimal.");setState({...state,settings:parsed,activity:[{id:crypto.randomUUID(),action:"Memperbarui pengaturan website",actor:"Gleans",object:"Pengaturan",at:new Date().toISOString()},...state.activity].slice(0,100)});toast.success("Pengaturan demo disimpan.");}
-  return <Context.Provider value={{state,adminEmail:email,ready,error,save,configure,revoke:id=>{setState(revokeDemoAdmin(state,id));toast.success("Akses admin demo dicabut.");},invite:member=>{setState(inviteDemoAdmin(state,member));toast.success("Undangan demo disimpan. Tidak ada email yang dikirim.");},log:(action,object)=>setState(current=>({...current,activity:[{id:crypto.randomUUID(),action,object,actor:"Gleans",at:new Date().toISOString()},...current.activity].slice(0,100)})),clearActivity:()=>setState(current=>({...current,activity:[]})),reset:()=>setState(initialAdmin())}}>{children}</Context.Provider>;
+  const [state,setState]=useState(emptyAdminState); const [ready,setReady]=useState(false); const [error,setError]=useState(""); const [limited,setLimited]=useState(false);
+  const refresh = useCallback(async () => {
+    try {
+      const response = await fetch("/api/admin/overview", { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Data admin belum dapat dimuat.");
+      setState(data.state); setLimited(data.limited); setError("");
+    } catch (cause) { setState(emptyAdminState()); setError(cause instanceof Error ? cause.message : "Data admin belum dapat dimuat."); }
+    finally { setReady(true); }
+  }, []);
+  useEffect(() => { void refresh(); const listener = () => { void refresh(); }; window.addEventListener(ORDER_ARRIVED_EVENT, listener); return () => window.removeEventListener(ORDER_ARRIVED_EVENT, listener); }, [refresh]);
+  return <Context.Provider value={{state,adminEmail:email,ready,error,limited,refresh,save:unavailable,configure:unavailable,revoke:unavailable,invite:unavailable,log:unavailable,clearActivity:unavailable,reset:unavailable}}>{children}</Context.Provider>;
 }
 export function useAdmin(){const value=useContext(Context);if(!value)throw new Error("Admin provider missing");return value;}

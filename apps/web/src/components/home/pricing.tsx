@@ -14,7 +14,7 @@ export function Pricing() {
       <div className="container-page flex flex-col gap-10 md:gap-14 lg:gap-20">
         <SectionHeading
           title="Pilih paket sesuai kebutuhanmu"
-          description="Gleans hadir untuk mendukung setiap kebutuhan penulisan akademikmu."
+          description="Lebih hemat cek plagiarisme, dari tugas hingga skripsi."
         />
         <div className="flex flex-col gap-4 md:grid md:grid-cols-2 lg:grid-cols-3">
           {PLANS.map((plan, i) => (

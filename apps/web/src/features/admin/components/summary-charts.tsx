@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import { AdminFilterDropdown } from "./filter-dropdown";
 import { formatRupiah } from "@/lib/format";
-import { summaryDemoHistory } from "@/features/admin/lib/summary-demo";
+import { useAdmin } from "./provider";
 
 type Point = { date: string; label: string; value: number };
 const shortMoney = (value: number) => value >= 1000000 ? `${new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 }).format(value / 1000000)} jt` : value >= 1000 ? `${new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 }).format(value / 1000)} rb` : String(value);
 
 export function AdminSummaryCharts() {
+  const { state } = useAdmin();
   const [days, setDays] = useState(7);
   const [today, setToday] = useState<string | null>(null);
   useEffect(() => {
@@ -22,13 +23,13 @@ export function AdminSummaryCharts() {
     day.setUTCDate(day.getUTCDate() - days + 1 + i);
     return { date: day.toISOString().slice(0, 10), label: new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", timeZone: "UTC" }).format(day).toUpperCase() };
   });
-  const history = summaryDemoHistory(today);
+  const history = dates.map(d => ({ date: d.date, orders: state.orders.filter(o => o.date === d.date).length, income: state.orders.filter(o => o.date === d.date && o.payment === "Berhasil").reduce((sum, o) => sum + o.amount, 0) }));
   const income = dates.map(d => ({ ...d, value: history.find(p => p.date === d.date)?.income || 0 }));
   const orders = dates.map(d => ({ ...d, value: history.find(p => p.date === d.date)?.orders || 0 }));
   return <section className="mt-7" aria-label="Grafik pendapatan dan pesanan">
     <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Tren {days} hari terakhir</h2><div className="ml-auto flex flex-wrap items-center justify-end gap-3"><AdminFilterDropdown label={`Periode grafik: ${days} hari`} value={`${days} hari`} options={["7 hari","14 hari","30 hari"]} onChange={value=>setDays(parseInt(value,10))}/></div></div>
     <div className="grid min-w-0 gap-4 xl:grid-cols-2">
-      <BarChart title="TOTAL PENDAPATAN" points={income} money/>
+      <BarChart title="NILAI PESANAN TERBAYAR" points={income} money/>
       <BarChart title="TOTAL PESANAN" points={orders}/>
     </div>
   </section>;

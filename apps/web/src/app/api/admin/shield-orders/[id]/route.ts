@@ -6,6 +6,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   try {
     if (!await currentAdmin()) return json({ error: "Akses ditolak." }, 403);
     const order = await findOrder((await context.params).id); if (!order) return json({ error: "Pesanan tidak ditemukan." }, 404);
+    if (order.fulfillment_status === "completed" && order.report_expires_at && Date.parse(order.report_expires_at) <= Date.now()) return json({ error: "Masa penyimpanan dokumen telah berakhir." }, 410);
     const { data, error } = await paymentAdmin().storage.from(PAYMENT_DOCUMENT_BUCKET).createSignedUrl(order.document_key, 60);
     if (error || !data?.signedUrl) throw new Error("DOWNLOAD_UNAVAILABLE");
     return new Response(null, { status: 302, headers: { ...PRIVATE_HEADERS, Location: data.signedUrl, "Referrer-Policy": "no-referrer" } });

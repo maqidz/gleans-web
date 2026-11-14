@@ -37,17 +37,17 @@ test('Sandbox is explicit; live mode and absent credentials fail closed',()=>{
 test('invoice signs the server amount and rejects unexpected merchant, amount and redirect', async()=>{
   const previous={...process.env};const originalFetch=globalThis.fetch;
   Object.assign(process.env,{DUITKU_ENV:'sandbox',DUITKU_MERCHANT_CODE:'DS123',DUITKU_API_KEY:'test-secret',DUITKU_PUBLIC_URL:'https://shop.example.test'});
-  const order={id:'GLS-test',amount:10000,document_name:'paper.txt'};
+  const order={id:'GLS-test',amount:8000,document_name:'paper.txt'};
   try{
     let variation={}; let expectedEmail="test@example.invalid";
     globalThis.fetch=async(url,init)=>{
       assert.equal(url,'https://sandbox.duitku.com/webapi/api/merchant/v2/inquiry');
       const payload=JSON.parse(init.body);
       assert.equal(payload.email, expectedEmail);
-      assert.equal(payload.paymentMethod,'NQ');assert.equal(payload.paymentAmount,10000);assert.equal(payload.signature,gateway.signature('DS123GLS-test10000','test-secret'));
+      assert.equal(payload.paymentMethod,'NQ');assert.equal(payload.paymentAmount,8000);assert.equal(payload.signature,gateway.signature('DS123GLS-test8000','test-secret'));
       assert.equal(payload.callbackUrl,'https://shop.example.test/api/payments/duitku/callback');
       assert.equal(payload.returnUrl,'https://shop.example.test/pembayaran?order=GLS-test');
-      return Response.json({statusCode:'00',merchantCode:'DS123',amount:'10000',reference:'ref',paymentUrl:'https://sandbox.duitku.com/pay',...variation});
+      return Response.json({statusCode:'00',merchantCode:'DS123',amount:'8000',reference:'ref',paymentUrl:'https://sandbox.duitku.com/pay',...variation});
     };
     await gateway.createInvoice(order,'NQ',{email:'test@example.invalid',name:'Tester',whatsapp:'08123456789'});
     expectedEmail=undefined;
@@ -58,9 +58,9 @@ test('invoice signs the server amount and rejects unexpected merchant, amount an
 });
 test('server pricing recalculates known promotions and refuses unknown codes',async()=>{
   const {resolvePromo}=await moduleFrom('src/features/orders/lib/pricing.ts');
-  assert.equal(resolvePromo('gleans10',10000).discount,1000);
-  assert.equal(resolvePromo('SKRIPSIAMAN',10000).discount,2500);
-  assert.equal(resolvePromo('fake',10000),null);
+  assert.equal(resolvePromo('gleans10',8000).discount,800);
+  assert.equal(resolvePromo('SKRIPSIAMAN',8000).discount,2000);
+  assert.equal(resolvePromo('fake',8000),null);
 });
 test('reconciliation verifies amount, ID and reference; paid state cannot regress',async()=>{
   let response={merchantOrderId:'GLS-test',amount:'10000',reference:'ref',statusCode:'01'};const writes=[];

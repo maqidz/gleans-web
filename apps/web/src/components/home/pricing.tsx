@@ -5,7 +5,7 @@ import { Button } from "@gleans/ui/button";
 import { formatRupiah } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-import { PLANS } from "@/lib/plans";
+import { PLANS, SHIELD_PRICE } from "@/lib/plans";
 
 const PLAN_ICONS = {
   starter: FileText,
@@ -40,7 +40,10 @@ export function Pricing() {
                     </span>
                     <div className="flex flex-col items-end gap-1 text-right">
                       <p className="text-2xl font-semibold">{formatRupiah(plan.price)}</p>
-                      <p className="text-muted-foreground line-through">{formatRupiah(plan.normal)}</p>
+                      <p className="text-muted-foreground">
+                        <span className="sr-only">Harga jika dibeli satuan: </span>
+                        <s>{formatRupiah(plan.checks * SHIELD_PRICE)}</s>
+                      </p>
                     </div>
                   </div>
                   <div className="flex flex-col gap-6">

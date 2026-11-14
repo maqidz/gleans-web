@@ -3,7 +3,7 @@ import { orderAccess } from "@/features/payments/server/guest";
 import { allowOrderLookup } from "@/features/payments/server/lookup-limit";
 import { dashboardUser } from "@/features/auth/server";
 import { createInvoice, paymentMethods, callbackOrigin, InvoiceRejected, selectQrisMethod } from "@/features/payments/server/duitku";
-import { findOrder, paymentAdmin, publicOrder } from "@/features/payments/server/repository";
+import { findOrder, ORDER_COLUMNS, paymentAdmin, publicOrder } from "@/features/payments/server/repository";
 import { reconcilePayment } from "@/features/payments/server/service";
 import { json, paymentError, sameOrigin } from "@/features/payments/server/http";
 export const runtime = "nodejs";
@@ -43,8 +43,9 @@ export async function POST(request: Request, context: Context) {
       if (!claimed?.length) return json({ error: "Pembayaran sedang dibuat. Muat ulang pesanan." }, 409);
       try {
         const invoice = await createInvoice(order, method.paymentMethod, { email: order.email, name: order.customer_name, whatsapp: order.whatsapp });
-        const { error: saveError } = await admin.database.from("duitku_orders").update({ status: "pending", payment_url: invoice.paymentUrl, reference: invoice.reference, qr_string: invoice.qrString ?? null }).eq("id", order.id).eq("status", "creating");
+        const { data: saved, error: saveError } = await admin.database.from("duitku_orders").update({ status: "pending", payment_url: invoice.paymentUrl, reference: invoice.reference, qr_string: invoice.qrString ?? null }).eq("id", order.id).eq("status", "creating").select(ORDER_COLUMNS).maybeSingle();
         if (saveError) throw new Error("DATABASE_UNAVAILABLE");
+        if (saved) return json({ order: publicOrder(saved) });
       } catch (error) {
         // Only a definite rejection allows retry. An ambiguous timeout must not create a duplicate invoice.
         if (error instanceof InvoiceRejected) {

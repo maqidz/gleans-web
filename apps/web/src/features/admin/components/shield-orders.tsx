@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { uploadPaymentFile } from "@/features/payments/upload-file";
 import type { PaymentOrder } from "@/features/payments/types";
 import { formatBytes, formatRupiah } from "@/lib/format";
+import { SHIELD_PRICE } from "@/lib/plans";
 import { ORDER_ARRIVED_EVENT } from "../lib/order-alerts";
 
 type Order = PaymentOrder & { whatsapp: string; customer_name: string; document_bytes: number };
@@ -70,7 +71,7 @@ export function ShieldOrders() {
   const pageNumbers = Array.from({length: pages}, (_, index) => index + 1).filter(number => pages <= 7 || number === 1 || number === pages || (currentPage <= 4 ? number <= 5 : currentPage >= pages - 3 ? number >= pages - 4 : Math.abs(number - currentPage) <= 1));
   const metrics = [["TOTAL PESANAN", orders.length], ["TOTAL ANTREAN", orders.filter(o => o.status === "paid" && o.fulfillment_status === "pending").length], ["TOTAL SELESAI", orders.filter(o => o.status === "paid" && o.fulfillment_status === "completed").length], ["PERLU TINDAKAN", orders.filter(o => o.status === "paid" && ["pending", "processing", "failed"].includes(o.fulfillment_status)).length]];
   return <section className="mb-8 min-w-0 space-y-5" aria-label="Pesanan Shield tersimpan">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-semibold sm:text-3xl">Pesanan</h1><p className="mt-2 text-sm text-muted-foreground">Pantau pembayaran, pemeriksaan, dan pengiriman laporan.</p></div><Button variant="outline" size="pill-sm" className="shadow-none" onClick={() => void load()}>Muat ulang</Button></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-semibold sm:text-3xl">Pesanan</h1><p className="mt-2 text-sm text-muted-foreground">Pantau pembayaran, pemeriksaan, dan pengiriman laporan.</p><p className="mt-1 text-sm text-muted-foreground">Tarif dasar Shield: {formatRupiah(SHIELD_PRICE)} per dokumen.</p></div><Button variant="outline" size="pill-sm" className="shadow-none" onClick={() => void load()}>Muat ulang</Button></div>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{metrics.map(([label, value]) => <section key={label} className={card}><p className="text-xs text-muted-foreground">{label}</p><p className="mt-4 text-2xl font-semibold">{loading ? "—" : value}</p></section>)}</div>
     {error && !selected && <p role="alert" className="text-sm text-destructive">{error}</p>}
     <div className="overflow-hidden rounded-2xl border border-border">

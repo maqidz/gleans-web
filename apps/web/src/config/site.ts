@@ -37,9 +37,11 @@ export const PRODUCTS = [
   },
 ] as const;
 
+export const PRICING_LINK = { label: "Paket Harga", href: "/#harga" } as const;
+
 export const NAV_LINKS = [
   { label: "Cek Pesanan", href: "/cek-pesanan" },
-  { label: "Harga", href: "/#harga" },
+  PRICING_LINK,
   { label: "Blog", href: "/blog" },
   { label: "Kontak kami", href: "#kontak" },
 ] as const;

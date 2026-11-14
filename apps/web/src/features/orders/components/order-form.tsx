@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { startCheckoutTransition } from "@/features/payments/checkout-transition";
 import { uploadPaymentFile } from "@/features/payments/upload-file";
 import { useDropzone } from "react-dropzone";
 import { Loader2, X } from "lucide-react";
@@ -57,6 +58,7 @@ export function OrderForm() {
         return;
       }
       setDocument({ file, words });
+      router.prefetch("/pembayaran");
       toast.success(`${file.name} siap diproses.`);
     } catch (error) {
       const detail = error instanceof Error ? error.message : "";
@@ -111,15 +113,14 @@ export function OrderForm() {
       const response = await fetch("/api/payments/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId: submission.current.requestId, ticketId: submission.current.ticket, words: document.words, whatsapp: parsed.data, ...(promo ? { promo: promo.code } : {}) }) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error);
-      if (body.order.status === "draft") {
-        try {
-          const payment = await fetch(`/api/payments/orders/${encodeURIComponent(body.order.id)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "pay" }) });
-          if (!payment.ok) { const result = await payment.json(); toast.error(result.error || "QRIS belum dapat dibuat. Coba kembali pada halaman pembayaran."); }
-        } catch { toast.error("QRIS belum dapat dikonfirmasi. Periksa pesanan pada halaman pembayaran."); }
-      }
-      router.push(`/pembayaran?order=${encodeURIComponent(body.order.id)}${body.access_code ? `#access=${encodeURIComponent(body.access_code)}` : ""}`);
-    } catch (error) { toast.error(error instanceof Error ? error.message : "Tidak dapat membuka pembayaran."); }
-    finally { setPaying(false); }
+      // The upload already established the guest cookie for this browser.
+      const order = { ...body.order, access_code: body.access_code };
+      startCheckoutTransition(order);
+      router.push(`/pembayaran?order=${encodeURIComponent(order.id)}`);
+    } catch (error) {
+      setPaying(false);
+      toast.error(error instanceof Error ? error.message : "Tidak dapat membuka pembayaran.");
+    }
   }
 
   return (
@@ -156,7 +157,7 @@ export function OrderForm() {
                 setWhatsappError(null);
               }}
               aria-invalid={whatsappError ? true : undefined}
-              placeholder="Masukkan No. Telepon"
+              placeholder="Masukkan No. WhatsApp"
               className="h-12 rounded-full pr-5 pl-13 md:text-base"
             />
           </div>

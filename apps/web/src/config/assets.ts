@@ -1,3 +1,3 @@
 export const ASSETS = {
-  illustration: "/images/gleans-illustration.png",
+  illustration: "/images/gleans-illustration-720.webp",
 };

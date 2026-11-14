@@ -10,38 +10,53 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 
 type NavigationAccount = { name: string; email: string; dashboardHref: string; settingsHref: string };
 
-export function AuthNav({ onNavigate }: { onNavigate?: () => void }) {
-  const [account, setAccount] = useState<NavigationAccount | null | undefined>(undefined);
-  const [failed, setFailed] = useState(false);
-  const [retry, setRetry] = useState(0);
+export function useNavigationAccount() {
+  const [account, setAccount] = useState<NavigationAccount | null>(null);
   const pathname = usePathname();
   useEffect(() => {
     let active = true;
-    async function load() {
-      try {
-        const response = await fetch("/api/auth/session", { cache: "no-store", credentials: "same-origin" });
-        if (!response.ok) throw new Error("Session unavailable");
-        const { account: currentAccount } = await response.json();
-        if (active) { setAccount(currentAccount); setFailed(false); }
-      } catch { if (active) setFailed(true); }
-    }
-    const refresh = () => { void load(); };
-    // Let the initial page resources finish before the navbar checks its session.
-    if (document.readyState === "complete") refresh();
-    else window.addEventListener("load", refresh, { once: true });
+    let pending: AbortController | undefined;
 
+    async function refresh() {
+      if (pending) return;
+      const controller = new AbortController();
+      pending = controller;
+      try {
+        const response = await fetch("/api/auth/session", {
+          cache: "no-store",
+          credentials: "same-origin",
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const { account: currentAccount } = await response.json();
+        if (active) setAccount(currentAccount);
+      } catch {
+        // Keep the current navigation usable if the session check fails.
+      } finally {
+        pending = undefined;
+      }
+    }
+
+    // The links are already rendered, so this check can wait for page resources.
+    if (document.readyState === "complete") void refresh();
+    else window.addEventListener("load", refresh, { once: true });
     window.addEventListener("focus", refresh);
-    const restore = (event: PageTransitionEvent) => { if (event.persisted) refresh(); };
+    const restore = (event: PageTransitionEvent) => { if (event.persisted) void refresh(); };
     window.addEventListener("pageshow", restore);
+
     return () => {
       active = false;
+      pending?.abort();
       window.removeEventListener("load", refresh);
       window.removeEventListener("focus", refresh);
       window.removeEventListener("pageshow", restore);
     };
-  }, [pathname, retry]);
-  if (failed && !account) return <Button size="pill-sm" variant="outline" onClick={() => { setFailed(false); setRetry(value => value + 1); }}>Muat ulang akun</Button>;
-  if (account === undefined) return <span role="status" aria-label="Memuat akun" className="h-10 w-24 rounded-full bg-muted" />;
+  }, [pathname]);
+
+  return account;
+}
+
+export function AuthNav({ account, onNavigate }: { account: NavigationAccount | null; onNavigate?: () => void }) {
   if (!account) return <div className="flex items-center gap-3"><Button asChild size="pill-sm" variant="outline" className="w-[100px]"><Link href="/masuk" onClick={onNavigate}>Masuk</Link></Button><Button asChild size="pill-sm" className="w-[100px]"><Link href="/daftar" onClick={onNavigate}>Daftar</Link></Button></div>;
   return <DropdownMenu>
     <DropdownMenuTrigger asChild>

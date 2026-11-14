@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { AuthNav } from "@/features/auth/components/auth-nav";
+import { AuthNav, useNavigationAccount } from "@/features/auth/components/auth-nav";
 import { useState } from "react";
 import { ChevronDown, Menu, X } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
@@ -32,6 +32,7 @@ function SoonBadge() {
 }
 
 export function Navbar() {
+  const account = useNavigationAccount();
   const [open, setOpen] = useState(false);
   const [productsOpen, setProductsOpen] = useState(false);
   const [soonName, setSoonName] = useState<string | null>(null);
@@ -93,7 +94,7 @@ export function Navbar() {
               {l.label}
             </Link>
           ))}
-          <AuthNav />
+          <AuthNav account={account} />
         </nav>
 
         <div className="flex items-center gap-1 lg:hidden">
@@ -174,7 +175,7 @@ export function Navbar() {
             ))}
           </nav>
           <div className="mt-6 flex gap-3 px-5 pb-6">
-            <AuthNav onNavigate={() => setOpen(false)} />
+            <AuthNav account={account} onNavigate={() => setOpen(false)} />
           </div>
         </div>
       )}

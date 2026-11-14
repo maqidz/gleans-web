@@ -26,7 +26,7 @@ export function Logo({ className }: { className?: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src="/images/gleans-logo.png"
+      src="/images/gleans-logo.webp"
       alt="Gleans"
       width={312}
       height={102}

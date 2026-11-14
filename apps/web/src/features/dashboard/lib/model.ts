@@ -31,7 +31,10 @@ export function purchaseError(state: DemoState, p: Purchase): string | null {
   if (!Number.isSafeInteger(p.amount) || p.amount <= 0) return "Nominal tidak valid.";
   if (p.kind === "topup" && (p.amount < 10_000 || p.method !== "qris")) return "Top-up minimal Rp10.000 melalui QRIS demo.";
   if (p.kind === "package") { const plan = PLANS.find(x => x.id === p.planId); if (!plan || p.amount !== plan.price || p.method === "quota") return "Paket tidak valid."; }
-  if (p.kind === "order" && p.amount !== SHIELD_PRICE) return "Harga pesanan tidak valid.";
+  if (p.kind === "order") {
+    const pendingOrder = state.orders.find(order => order.id === p.id && order.payment === "pending");
+    if (p.amount !== (pendingOrder?.amount ?? SHIELD_PRICE)) return "Harga pesanan tidak valid.";
+  }
   if (p.method === "balance" && state.balance < p.amount) return "Saldo belum cukup. Isi saldo atau pilih QRIS demo.";
   if (p.method === "quota" && state.quota < 1) return "Kuota habis. Pilih saldo atau QRIS demo.";
   return null;

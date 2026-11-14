@@ -41,7 +41,7 @@ export default function DeteksiAiPage() {
           {
             step: "3",
             title: "Unduh hasil",
-            body: "Cari nomor invoice atau WhatsApp di Cek Pesanan. Setelah pemeriksaan selesai, unduh hasil selama 24 jam. Simpan tautan akses untuk membuka hasil di perangkat lain.",
+            body: "Cari lewat invoice atau WhatsApp di Cek Pesanan. Hasil bisa diunduh dalam 24 jam setelah pemeriksaan selesai.",
           },
         ]}
       />

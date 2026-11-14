@@ -2,11 +2,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { TikTokIcon } from "@/components/brand/icons";
 import { Logo } from "@/components/brand/logo";
-import { CONTACT } from "@/config/site";
+import { CONTACT, PRICING_LINK } from "@/config/site";
 
 const MENU = [
   { label: "Beranda", href: "/" },
   { label: "Cek Pesanan", href: "/cek-pesanan" },
+  PRICING_LINK,
   { label: "Blog & Berita", href: "/blog" },
   { label: "Syarat & Ketentuan", href: "/syarat-ketentuan" },
   { label: "Kebijakan Privasi", href: "/kebijakan-privasi" },

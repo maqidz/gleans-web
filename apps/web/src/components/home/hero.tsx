@@ -29,13 +29,16 @@ export function Hero() {
           </Button>
         </div>
       </div>
-      <Image
+      {/* eslint-disable-next-line @next/next/no-img-element -- Responsive WebP files are served directly. */}
+      <img
         src={ASSETS.illustration}
+        srcSet="/images/gleans-illustration-480.webp 480w, /images/gleans-illustration-720.webp 720w, /images/gleans-illustration-1040.webp 1040w"
+        sizes="(min-width: 1024px) 460px, (min-width: 768px) 420px, 340px"
         alt="Ilustrasi Gleans: dokumen, sitasi, dan parafrase dalam satu platform"
         width={460}
         height={345}
-        priority
         fetchPriority="high"
+        decoding="async"
         className="h-auto w-full max-w-[340px] md:max-w-[420px] lg:w-[460px] lg:max-w-none"
       />
     </section>

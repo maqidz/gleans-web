@@ -25,14 +25,23 @@ export function AuthNav({ onNavigate }: { onNavigate?: () => void }) {
         if (active) { setAccount(currentAccount); setFailed(false); }
       } catch { if (active) setFailed(true); }
     }
-    void load();
     const refresh = () => { void load(); };
+    // Let the initial page resources finish before the navbar checks its session.
+    if (document.readyState === "complete") refresh();
+    else window.addEventListener("load", refresh, { once: true });
+
     window.addEventListener("focus", refresh);
-    window.addEventListener("pageshow", refresh);
-    return () => { active = false; window.removeEventListener("focus", refresh); window.removeEventListener("pageshow", refresh); };
+    const restore = (event: PageTransitionEvent) => { if (event.persisted) refresh(); };
+    window.addEventListener("pageshow", restore);
+    return () => {
+      active = false;
+      window.removeEventListener("load", refresh);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", restore);
+    };
   }, [pathname, retry]);
   if (failed && !account) return <Button size="pill-sm" variant="outline" onClick={() => { setFailed(false); setRetry(value => value + 1); }}>Muat ulang akun</Button>;
-  if (account === undefined) return <span role="status" aria-label="Memuat akun" className="h-10 w-24 animate-pulse rounded-full bg-muted" />;
+  if (account === undefined) return <span role="status" aria-label="Memuat akun" className="h-10 w-24 rounded-full bg-muted" />;
   if (!account) return <div className="flex items-center gap-3"><Button asChild size="pill-sm" variant="outline" className="w-[100px]"><Link href="/masuk" onClick={onNavigate}>Masuk</Link></Button><Button asChild size="pill-sm" className="w-[100px]"><Link href="/daftar" onClick={onNavigate}>Daftar</Link></Button></div>;
   return <DropdownMenu>
     <DropdownMenuTrigger asChild>

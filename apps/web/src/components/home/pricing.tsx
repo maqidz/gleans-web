@@ -61,7 +61,9 @@ export function Pricing() {
                   </div>
                 </div>
                 <Button asChild size="pill" className="w-full font-normal">
-                  <Link href={`/daftar?paket=${plan.id}`}>Bayar Sekarang</Link>
+                  <Link href={`/daftar?paket=${plan.id}`} aria-label={`Bayar Sekarang untuk paket ${plan.name}`}>
+                    Bayar Sekarang
+                  </Link>
                 </Button>
               </article>
             );

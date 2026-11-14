@@ -35,6 +35,7 @@ export function Hero() {
         width={460}
         height={345}
         priority
+        fetchPriority="high"
         className="h-auto w-full max-w-[340px] md:max-w-[420px] lg:w-[460px] lg:max-w-none"
       />
     </section>

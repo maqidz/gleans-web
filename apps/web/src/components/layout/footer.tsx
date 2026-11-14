@@ -42,7 +42,13 @@ export function Footer() {
                 <ContactIcon src="/images/icon-sms.png" />
                 {CONTACT.email}
               </a>
-              <a href={CONTACT.instagramUrl} target="_blank" rel="noreferrer" className="footer-contact">
+              <a
+                href={CONTACT.instagramUrl}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Instagram ${CONTACT.instagram}`}
+                className="footer-contact"
+              >
                 <ContactIcon src="/images/icon-instagram.png" />
                 {CONTACT.instagram}
               </a>

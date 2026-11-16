@@ -8,14 +8,16 @@ import { Panel, Status, Empty, dateLabel } from "./shared";
 import { Button } from "@gleans/ui/button";
 import { formatRupiah } from "@/lib/format";
 import { PRODUCTS } from "@/config/site";
+import { useBillingTotals } from "@/features/payments/billing/client";
 export function DashboardOverview() {
   const { state } = useDashboard();
+  const { totals } = useBillingTotals(true);
   const [greeting, setGreeting] = useState("Selamat Datang");
   useEffect(() => {
     const hour = new Date().getHours();
     setGreeting(hour >= 5 && hour < 11 ? "Selamat Pagi" : hour >= 11 && hour < 15 ? "Selamat Siang" : hour >= 15 && hour < 18 ? "Selamat Sore" : "Selamat Malam");
   }, []);
-  const stats = [{ label: "TOTAL SALDO", value: formatRupiah(state.balance), icon: Wallet, href: "/dashboard/paket-saldo", action: "Isi saldo" }, { label: "TOTAL KUOTA", value: String(state.quota), icon: Layers, href: "/dashboard/paket-saldo", action: "Lihat paket" }, { label: "TOTAL PESANAN", value: String(state.orders.length), icon: Clock3, href: "/dashboard/pesanan", action: "Lihat pesanan" }];
+  const stats = [{ label: "SALDO SANDBOX", value: totals ? formatRupiah(totals.balance) : "—", icon: Wallet, href: "/dashboard/paket-saldo", action: "Isi saldo" }, { label: "KUOTA SANDBOX", value: totals ? String(totals.quota) : "—", icon: Layers, href: "/dashboard/paket-saldo", action: "Lihat paket" }, { label: "PESANAN DEMO", value: String(state.orders.length), icon: Clock3, href: "/dashboard/pesanan", action: "Lihat pesanan" }];
   return <><section aria-label="Sapaan pengguna" className="relative mb-7 flex items-center justify-between gap-4 overflow-hidden rounded-[24px] bg-[#101D42] p-6 text-white sm:gap-8 sm:px-8 sm:py-6">
     <div className="relative z-10 min-w-0 flex-1">
       <h1 className="break-words text-2xl font-semibold tracking-tight sm:text-3xl">{greeting}</h1>

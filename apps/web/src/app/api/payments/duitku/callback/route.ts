@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { findBillingTransaction, reconcileBilling } from "@/features/payments/billing/server";
+import { BILLING_ID } from "@/features/payments/billing/types";
 import { duitkuConfig, validSignature } from "@/features/payments/server/duitku";
 import { findOrder } from "@/features/payments/server/repository";
 import { reconcilePayment } from "@/features/payments/server/service";
@@ -14,6 +16,15 @@ export async function POST(request: Request) {
     const input = parsed.data;
     const { merchantCode, apiKey } = duitkuConfig();
     if (input.merchantCode !== merchantCode || !validSignature(`${merchantCode}${input.amount}${input.merchantOrderId}`, input.signature, apiKey)) return new Response("Invalid signature", { status: 401 });
+    if (BILLING_ID.test(input.merchantOrderId)) {
+      const transaction = await findBillingTransaction(input.merchantOrderId);
+      if (!transaction || transaction.method !== "qris" || Number(input.amount) !== transaction.amount ||
+          (transaction.reference && input.reference !== transaction.reference)) {
+        return new Response("Transaction mismatch", { status: 400 });
+      }
+      if (transaction.status !== "paid") await reconcileBilling(transaction, input.reference);
+      return new Response("OK", { status: 200 });
+    }
     const order = await findOrder(input.merchantOrderId);
     if (!order || Number(input.amount) !== order.amount || (order.reference && input.reference !== order.reference)) return new Response("Order mismatch", { status: 400 });
     if (order.status !== "paid") await reconcilePayment(order);

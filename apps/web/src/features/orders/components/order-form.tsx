@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { startCheckoutTransition } from "@/features/payments/checkout-transition";
-import { uploadPaymentFile } from "@/features/payments/upload-file";
+import { useBillingTotals } from "@/features/payments/billing/client";
+import { finishPaymentUpload, preparePaymentUpload, uploadPaymentFile } from "@/features/payments/upload-file";
 import { useDropzone } from "react-dropzone";
-import { Loader2, X } from "lucide-react";
+import { Layers, Loader2, QrCode, Wallet, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@gleans/ui/button";
 import { Input } from "@gleans/ui/input";
@@ -25,7 +27,14 @@ import {
 } from "@/features/orders/lib/order";
 import { cn } from "@/lib/utils";
 
-type Document = { file: File; words: number };
+type UploadPreparation = ReturnType<typeof preparePaymentUpload>;
+type Document = { file: File; words: number; requestId: string; preparation: UploadPreparation; preparedAt: number };
+
+const PAYMENT_METHODS = [
+  { id: "qris", label: "QRIS", icon: QrCode },
+  { id: "balance", label: "Saldo Gleans", icon: Wallet },
+  { id: "quota", label: "Kuota Shield", icon: Layers },
+] as const;
 
 export function OrderForm() {
   const router = useRouter();
@@ -36,11 +45,19 @@ export function OrderForm() {
   const [document, setDocument] = useState<Document | null>(null);
   const [reading, setReading] = useState(false);
   const [paying, setPaying] = useState(false);
-  const submission = useRef<{ file: File; ticket: string; requestId: string } | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<(typeof PAYMENT_METHODS)[number]["id"]>("qris");
+  const { totals, error: billingError, authRequired } = useBillingTotals(paymentMethod !== "qris");
+  const preparingUpload = useRef<UploadPreparation | null>(null);
 
   const subtotal = document ? PRICE_PER_DOCUMENT : 0;
   const discount = document ? (promo?.discount ?? 0) : 0;
   const total = subtotal - discount;
+  const paymentAllowed = paymentMethod === "qris" || (totals && (
+    paymentMethod === "balance" ? totals.balance >= total : totals.quota > 0
+  ));
+  const paymentHelp = billingError || (!totals ? "Memeriksa saldo dan kuota…" : paymentMethod === "quota"
+    ? `Kuota tersedia: ${totals.quota} pemeriksaan.`
+    : `Saldo tersedia: ${formatRupiah(totals.balance)}.`);
 
   async function acceptFile(file: File) {
     const fileError = validateFile(file);
@@ -57,8 +74,13 @@ export function OrderForm() {
         setDocument(null);
         return;
       }
-      setDocument({ file, words });
-      router.prefetch("/pembayaran");
+      const requestId = crypto.randomUUID();
+      router.prefetch(`/pembayaran?checkout=${requestId}`);
+      // Serialize ticket requests so a first-time guest cookie is in place if a file is replaced.
+      const preparation = Promise.resolve(preparingUpload.current).catch(() => null).then(() => preparePaymentUpload(file));
+      preparingUpload.current = preparation;
+      void preparation.catch(() => {});
+      setDocument({ file, words, requestId, preparation, preparedAt: Date.now() });
       toast.success(`${file.name} siap diproses.`);
     } catch (error) {
       const detail = error instanceof Error ? error.message : "";
@@ -98,29 +120,30 @@ export function OrderForm() {
     toast.success(`Kode ${applied.code} dipakai. ${applied.label}.`);
   }
 
-  async function handlePay() {
-    if (paying) return;
+  function handlePay() {
+    if (paying || !paymentAllowed) return;
     const parsed = whatsappSchema.safeParse(whatsapp);
     if (!parsed.success) { setWhatsappError(parsed.error.issues[0].message); return; }
     setWhatsappError(null);
     if (!document) { toast.error("Unggah dokumen yang mau diperiksa."); return; }
     setPaying(true);
-    try {
-      if (!submission.current || submission.current.file !== document.file) {
-        const ticket = await uploadPaymentFile(document.file);
-        submission.current = { file: document.file, ticket, requestId: crypto.randomUUID() };
+    const { file, words, requestId, preparation, preparedAt } = document;
+    let ticketId: string | undefined;
+    let usePreparation = Date.now() - preparedAt < 10 * 60_000;
+    startCheckoutTransition(requestId, { document_name: file.name, amount: total, method: paymentMethod }, async () => {
+      if (usePreparation) {
+        usePreparation = false;
+        const upload = await preparation.catch(() => null);
+        if (upload) ticketId = await finishPaymentUpload(file, upload);
       }
-      const response = await fetch("/api/payments/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId: submission.current.requestId, ticketId: submission.current.ticket, words: document.words, whatsapp: parsed.data, ...(promo ? { promo: promo.code } : {}) }) });
+      ticketId ??= await uploadPaymentFile(file);
+      const response = await fetch("/api/payments/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, ticketId, words, whatsapp: parsed.data, method: paymentMethod, ...(promo ? { promo: promo.code } : {}) }) });
       const body = await response.json();
-      if (!response.ok) throw new Error(body.error);
+      if (!response.ok || !body.order) throw new Error(body.error || "Tidak dapat membuka pembayaran.");
       // The upload already established the guest cookie for this browser.
-      const order = { ...body.order, access_code: body.access_code };
-      startCheckoutTransition(order);
-      router.push(`/pembayaran?order=${encodeURIComponent(order.id)}`);
-    } catch (error) {
-      setPaying(false);
-      toast.error(error instanceof Error ? error.message : "Tidak dapat membuka pembayaran.");
-    }
+      return { ...body.order, access_code: body.access_code };
+    });
+    router.push(`/pembayaran?checkout=${requestId}`);
   }
 
   return (
@@ -153,7 +176,6 @@ export function OrderForm() {
               value={whatsapp}
               onChange={(e) => {
                 setWhatsapp(e.target.value);
-                submission.current = null;
                 setWhatsappError(null);
               }}
               aria-invalid={whatsappError ? true : undefined}
@@ -177,7 +199,6 @@ export function OrderForm() {
               value={promoInput}
               onChange={(e) => {
                 setPromoInput(e.target.value);
-                submission.current = null;
                 setPromo(null);
               }}
               placeholder="Masukkan Kode Promo"
@@ -227,7 +248,6 @@ export function OrderForm() {
 
       <section className="flex min-w-0 flex-col gap-6 rounded-[24px] border bg-white p-4">
         <h2 className="text-xl font-semibold">Ringkasan Pesanan</h2>
-        <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Sandbox Duitku: simulasi pembayaran tanpa uang sungguhan. Kamu dapat memesan tanpa membuat akun.</p>
 
         <div className="flex-1">
           {document ? (
@@ -256,6 +276,38 @@ export function OrderForm() {
           )}
         </div>
 
+        <fieldset disabled={paying}>
+          <legend className="mb-2 text-sm font-semibold">Metode pembayaran</legend>
+          <div className="grid gap-2">
+            {PAYMENT_METHODS.filter(({ id }) => id !== "quota" || paymentMethod === "quota" || !!totals?.quota).map(({ id, label, icon: Icon }) => (
+              <label
+                key={id}
+                className={cn(
+                  "flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2 text-sm font-medium transition-colors",
+                  paymentMethod === id && "border-primary bg-accent",
+                )}
+              >
+                <Icon aria-hidden="true" className="size-4 shrink-0 text-primary" />
+                <span className="flex-1">{label}</span>
+                <input
+                  type="radio"
+                  name="shield-payment-method"
+                  value={id}
+                  checked={paymentMethod === id}
+                  onChange={() => setPaymentMethod(id)}
+                  aria-describedby={id !== "qris" && paymentMethod === id ? "shield-payment-method-info" : undefined}
+                  className="size-4 shrink-0 accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                />
+              </label>
+            ))}
+          </div>
+          {paymentMethod !== "qris" && (
+            <p id="shield-payment-method-info" className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              {paymentHelp}
+            </p>
+          )}
+        </fieldset>
+
         <div className="flex flex-col gap-3">
           <div className="text-muted-foreground flex items-center justify-between">
             <span>Subtotal</span>
@@ -269,17 +321,27 @@ export function OrderForm() {
           )}
           <div className="flex items-center justify-between font-semibold">
             <span>Total Pembayaran</span>
-            <span>{formatRupiah(total)}</span>
+            <span>{document && paymentMethod === "quota" ? "1 kuota Shield" : formatRupiah(total)}</span>
           </div>
-          <Button
-            type="button"
-            size="pill"
-            onClick={handlePay}
-            disabled={!document || reading || paying}
-            className="w-full font-normal disabled:opacity-100"
-          >
-            {paying ? "Menyiapkan pesanan…" : "Bayar Sekarang"}
-          </Button>
+          {paymentMethod !== "qris" && authRequired ? (
+            <Button asChild variant="outline" size="pill" className="w-full font-normal">
+              <Link href="/masuk">Masuk untuk menggunakan saldo</Link>
+            </Button>
+          ) : paymentMethod === "balance" && totals && !paymentAllowed ? (
+            <Button asChild variant="outline" size="pill" className="w-full font-normal">
+              <Link href="/dashboard/paket-saldo" target="_blank" rel="noreferrer">Isi Saldo Gleans</Link>
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              size="pill"
+              onClick={handlePay}
+              disabled={!document || reading || paying || !paymentAllowed}
+              className="w-full font-normal disabled:opacity-100"
+            >
+              {paymentMethod === "balance" ? "Bayar dengan Saldo" : paymentMethod === "quota" ? "Gunakan 1 Kuota" : "Bayar Sekarang"}
+            </Button>
+          )}
         </div>
       </section>
     </div>

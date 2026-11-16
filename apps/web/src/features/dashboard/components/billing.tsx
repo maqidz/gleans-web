@@ -1,18 +1,234 @@
 "use client";
-import { useState } from "react";
-import { Plus, Wallet, Layers } from "lucide-react";
-import { FilterDropdown } from "@gleans/ui/filter-dropdown";
-import { useDashboard } from "./provider";
-import { Heading, Panel, Choice, Checkout, newPurchase, fieldClass, dateLabel, methodLabels, Empty } from "./shared";
-import { PLANS } from "@/lib/plans";
-import { formatRupiah } from "@/lib/format";
-import { type Purchase, type Method } from "@/features/dashboard/lib/model";
+
+import { useCallback, useEffect, useState } from "react";
+import { Layers, Loader2, Plus, Wallet } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@gleans/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@gleans/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@gleans/ui/dialog";
+import { billingRequest } from "@/features/payments/billing/client";
+import { BILLING_ID, MAX_TOPUP, MIN_TOPUP, type BillingSnapshot, type BillingTransaction } from "@/features/payments/billing/types";
+import { formatRupiah } from "@/lib/format";
+import { PLANS } from "@/lib/plans";
 import { cn } from "@/lib/utils";
+import { Choice, dateLabel, Empty, fieldClass, Heading, Panel } from "./shared";
+
+type Plan = (typeof PLANS)[number];
+type Intent =
+  | { kind: "topup"; requestId: string; amount: number }
+  | { kind: "package"; requestId: string; planId: Plan["id"]; method: "qris" | "balance" };
+
+const methods = [{ value: "qris", label: "QRIS" }, { value: "balance", label: "Saldo Gleans" }];
+const methodLabels = { qris: "QRIS", balance: "Saldo Gleans", quota: "Kuota Shield" };
+const statuses = {
+  creating: "Transaksi belum dikonfirmasi",
+  pending: "Menunggu pembayaran",
+  paid: "Berhasil",
+  failed: "Gagal",
+  expired: "Kedaluwarsa",
+};
+
+function transactionTitle(transaction: BillingTransaction) {
+  if (transaction.kind === "topup") return "Top-up Saldo Gleans";
+  if (transaction.kind === "shield") return "Pesanan Gleans Shield";
+  return `Paket Shield ${PLANS.find(plan => plan.id === transaction.plan_id)?.name ?? ""}`.trim();
+}
+
 export function DashboardBilling() {
-  const { state } = useDashboard(); const [amount, setAmount] = useState("25000"); const [method, setMethod] = useState<Method>("balance"); const [purchase, setPurchase] = useState<Purchase | null>(null); const [tab, setTab] = useState("all"); const [topupOpen, setTopupOpen] = useState(false);
-  const valid = Number.isSafeInteger(Number(amount)) && Number(amount) >= 10000;
-  const transactions = state.transactions.filter(x => tab === "all" || x.kind === tab || tab === "payment" && x.kind === "refund");
-  return <><Heading title="Paket & Saldo" description="Pilih cara yang nyaman untuk kebutuhan pemeriksaanmu." /><div className="grid gap-4 md:grid-cols-2"><Panel className="border border-border bg-white"><div className="flex items-center gap-2 text-sm text-muted-foreground"><Wallet className="size-5" />TOTAL SALDO</div><p className="mt-4 text-3xl font-semibold">{formatRupiah(state.balance)}</p><Button size="pill-sm" className="mt-5" onClick={() => setTopupOpen(true)}><Plus />Top-up demo</Button></Panel><Panel className="border border-border bg-white"><div className="flex items-center gap-2 text-sm text-muted-foreground"><Layers className="size-5" />TOTAL KUOTA</div><p className="mt-4 text-2xl font-semibold">{state.quota} pemeriksaan</p></Panel></div><section className="mt-8"><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-semibold">Pilih paket Shield</h2><div className="w-44"><Choice label="Metode pembelian paket" value={method} onChange={v => setMethod(v as Method)} options={[{ value: "balance", label: "Saldo Gleans" }, { value: "qris", label: "QRIS demo" }]} /></div></div><div className="grid gap-4 md:grid-cols-3">{PLANS.map(p => <Panel key={p.id} className="flex flex-col border border-border bg-white"><div className="flex items-center justify-between"><h3 className="font-semibold">{p.name}</h3><span className="rounded-full bg-white px-3 py-1 text-xs text-primary">{p.checks}x cek</span></div><p className="mt-6 text-2xl font-semibold">{formatRupiah(p.price)}</p><p className="mt-2 flex-1 text-xs leading-relaxed text-muted-foreground">{p.blurb}</p>{method === "balance" && state.balance < p.price ? <><p className="mt-4 text-xs text-muted-foreground">Saldo belum cukup. Isi saldo atau pilih QRIS demo.</p><Button variant="outline" size="pill-sm" className="mt-3" onClick={() => { setAmount(String(p.price)); setTopupOpen(true); }}>Isi saldo</Button></> : <Button size="pill-sm" className="mt-6" onClick={() => setPurchase(newPurchase({ kind: "package", amount: p.price, planId: p.id, method }))}>Pilih {p.name}</Button>}</Panel>)}</div></section><section aria-label="Riwayat transaksi" className="mt-8 min-w-0"><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold">Riwayat transaksi</h2><div className="ml-auto"><FilterDropdown label="Filter transaksi" value={tab} onChange={setTab} options={[{value:"all",label:"Semua"},{value:"payment",label:"Pembayaran"},{value:"topup",label:"Top-up"}]}/></div></div>{transactions.length ? <ul tabIndex={0} aria-label="Daftar transaksi demo" className="max-h-96 space-y-3 overflow-y-auto">{transactions.map(t => <li key={t.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-white p-4"><div><p className="text-sm font-medium">{t.title}</p><p className="mt-1 text-xs text-muted-foreground">{dateLabel(t.at)} · {methodLabels[t.method]}</p></div><div className="text-right"><p className={cn("text-sm font-medium", t.outcome === "success" && t.amount > 0 && "text-green-700")}>{t.method === "quota" ? `${t.kind === "refund" ? "+" : "−"}1 kuota` : `${t.amount > 0 ? "+" : "−"}${formatRupiah(Math.abs(t.amount))}`}</p><p className="mt-1 text-xs text-muted-foreground">{t.outcome === "success" ? "Berhasil" : t.outcome === "failed" ? "Gagal · tidak ditagih" : "Kedaluwarsa · tidak ditagih"}</p></div></li>)}</ul> : <Empty title="Belum ada transaksi" description="Riwayat top-up dan pembayaran demo akan muncul di sini." />}</section><Dialog open={topupOpen} onOpenChange={setTopupOpen}><DialogContent className="max-h-[85dvh] overflow-y-auto rounded-[24px]"><DialogHeader><DialogTitle>Isi saldo</DialogTitle><DialogDescription>Pilih nominal top-up melalui QRIS demo.</DialogDescription></DialogHeader><div className="my-5 grid grid-cols-3 gap-2">{[25000,50000,100000].map(v => <button aria-pressed={Number(amount) === v} key={v} onClick={() => setAmount(String(v))} className={cn("rounded-xl border bg-white px-2 py-3 text-xs", Number(amount) === v && "border-primary bg-accent text-primary")}>{formatRupiah(v)}</button>)}</div><form onSubmit={e => { e.preventDefault(); if (valid) { setTopupOpen(false); setPurchase(newPurchase({ kind: "topup", amount: Number(amount), method: "qris" })); } }}><label className="mb-2 block text-sm" htmlFor="topup">Nominal lainnya</label><input id="topup" type="number" min={10000} step={1} required value={amount} onChange={e => setAmount(e.target.value)} className={fieldClass} /><p className="mt-2 text-xs text-muted-foreground">Minimal Rp10.000</p><Button type="submit" size="pill-sm" className="mt-5 w-full" disabled={!valid}><Plus />Top-up demo</Button></form></DialogContent></Dialog>{purchase && <Checkout key={purchase.id} purchase={purchase} close={() => setPurchase(null)} />}</>;
+  const params = useSearchParams();
+  const returnedId = params.get("billing");
+  const [snapshot, setSnapshot] = useState<BillingSnapshot | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [method, setMethod] = useState<"qris" | "balance">("qris");
+  const [filter, setFilter] = useState("all");
+  const [topupOpen, setTopupOpen] = useState(false);
+  const [amount, setAmount] = useState("25000");
+  const [intent, setIntent] = useState<Intent | null>(null);
+  const [transaction, setTransaction] = useState<BillingTransaction | null>(null);
+  const [busy, setBusy] = useState(false);
+  const refresh = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const data = await billingRequest<BillingSnapshot>("", { signal });
+      if (!signal?.aborted) { setSnapshot(data); setLoadError(""); }
+    } catch (error) {
+      if (!signal?.aborted) setLoadError(error instanceof Error ? error.message : "Paket & Saldo belum dapat dimuat.");
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void refresh(controller.signal);
+    return () => controller.abort();
+  }, [refresh]);
+
+  const returned = returnedId && BILLING_ID.test(returnedId) ? snapshot?.transactions.find(item => item.id === returnedId) : undefined;
+  const current = transaction ?? returned;
+  const plan = intent?.kind === "package" ? PLANS.find(item => item.id === intent.planId) : undefined;
+  const history = snapshot?.transactions.filter(item => filter === "all" || item.kind === filter) ?? [];
+  const amountNumber = Number(amount);
+  const validTopup = Number.isInteger(amountNumber) && amountNumber >= MIN_TOPUP && amountNumber <= MAX_TOPUP;
+
+  function openTopup(value = 25_000) {
+    setActionError("");
+    setAmount(String(value));
+    setTopupOpen(true);
+  }
+
+  function closePayment() {
+    if (busy) return;
+    setIntent(null);
+    setTransaction(null);
+    setActionError("");
+    if (returnedId) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("billing");
+      window.history.replaceState(null, "", url);
+    }
+  }
+
+  async function purchase() {
+    if (!intent || busy) return;
+    setBusy(true);
+    setActionError("");
+    try {
+      const result = await billingRequest<{ transaction: BillingTransaction }>("", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(intent),
+      });
+      setIntent(null);
+      setTransaction(result.transaction);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Transaksi belum dapat diproses.");
+    } finally {
+      setBusy(false);
+      void refresh();
+    }
+  }
+
+  async function check() {
+    if (!current || busy) return;
+    setBusy(true);
+    setActionError("");
+    try {
+      const data = await billingRequest<{ transaction: BillingTransaction }>(`/${encodeURIComponent(current.id)}`, { method: "POST" });
+      setTransaction(data.transaction);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Status belum dapat diperiksa.");
+    } finally {
+      setBusy(false);
+      void refresh();
+    }
+  }
+
+  return (
+    <>
+      <Heading title="Paket & Saldo" description="Isi saldo atau beli kuota pemeriksaan Gleans Shield." />
+      <p className="mb-5 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">Duitku Sandbox. Saldo dan kuota di halaman ini hanya untuk pengujian.</p>
+      {loadError && <div className="mb-5 flex flex-wrap items-center gap-3" role="alert"><span className="text-sm text-destructive">{loadError}</span><Button size="pill-sm" variant="outline" onClick={() => void refresh()}>Muat ulang</Button></div>}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Panel className="border bg-white">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Wallet aria-hidden="true" className="size-5" />TOTAL SALDO</div>
+          <p className="mt-4 text-3xl font-semibold">{snapshot ? formatRupiah(snapshot.balance) : "—"}</p>
+          <Button size="pill-sm" className="mt-5" disabled={!snapshot} onClick={() => openTopup()}><Plus aria-hidden="true" />Isi saldo</Button>
+        </Panel>
+        <Panel className="border bg-white">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Layers aria-hidden="true" className="size-5" />TOTAL KUOTA</div>
+          <p className="mt-4 text-2xl font-semibold">{snapshot ? `${snapshot.quota} pemeriksaan` : "—"}</p>
+        </Panel>
+      </div>
+      <section className="mt-8">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">Pilih paket Shield</h2>
+          <div className="w-44"><Choice label="Metode pembelian paket" value={method} onChange={value => setMethod(value === "balance" ? "balance" : "qris")} options={methods} /></div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          {PLANS.map(item => {
+            const insufficient = !!snapshot && method === "balance" && snapshot.balance < item.price;
+            return (
+              <Panel key={item.id} className="flex flex-col border bg-white">
+                <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">{item.name}</h3><span className="text-xs text-primary">{item.checks}x cek</span></div>
+                <p className="mt-6 text-2xl font-semibold">{formatRupiah(item.price)}</p>
+                <p className="mt-2 flex-1 text-xs leading-relaxed text-muted-foreground">{item.blurb}</p>
+                {insufficient ? (
+                  <>
+                    <p className="mt-4 text-xs text-muted-foreground">Saldo belum cukup.</p>
+                    <Button size="pill-sm" variant="outline" className="mt-3" onClick={() => openTopup(Math.max(MIN_TOPUP, item.price - snapshot.balance))}>Isi saldo</Button>
+                  </>
+                ) : (
+                  <Button size="pill-sm" className="mt-6" disabled={!snapshot} onClick={() => {
+                    setActionError("");
+                    setIntent({ kind: "package", requestId: crypto.randomUUID(), planId: item.id, method });
+                  }}>Pilih {item.name}</Button>
+                )}
+              </Panel>
+            );
+          })}
+        </div>
+      </section>
+      <section aria-label="Riwayat transaksi" className="mt-8">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-semibold">Riwayat transaksi</h2>
+          <div className="w-40"><Choice label="Filter transaksi" value={filter} onChange={setFilter} options={[{ value: "all", label: "Semua" }, { value: "topup", label: "Top-up" }, { value: "package", label: "Paket" }, { value: "shield", label: "Pesanan Shield" }]} /></div>
+        </div>
+        {!snapshot && !loadError && <p role="status" className="text-sm text-muted-foreground">Memuat riwayat transaksi…</p>}
+        {snapshot && (history.length ? (
+          <ul className="space-y-2">
+            {history.map(item => (
+              <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-white px-4 py-3 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium">{transactionTitle(item)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{dateLabel(item.created_at)} · {methodLabels[item.method]}</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <p className="font-medium">{item.method === "quota" ? "−1 kuota" : formatRupiah(item.amount)}</p>
+                    <p className="text-xs text-muted-foreground">{statuses[item.status]}</p>
+                  </div>
+                  {item.method === "qris" && ["creating", "pending"].includes(item.status) && <Button size="pill-sm" variant="outline" onClick={() => { setActionError(""); setTransaction(item); }}>Lihat pembayaran</Button>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : <Empty title="Belum ada transaksi" description="Top-up, pembelian paket, dan penggunaan saldo atau kuota akan muncul di sini." />)}
+      </section>
+      <Dialog open={topupOpen} onOpenChange={setTopupOpen}>
+        <DialogContent className="rounded-[24px]">
+          <DialogHeader><DialogTitle>Isi saldo</DialogTitle><DialogDescription>Top-up melalui QRIS Duitku Sandbox.</DialogDescription></DialogHeader>
+          <div className="grid grid-cols-3 gap-2">
+            {[25_000, 50_000, 100_000].map(value => <button type="button" aria-pressed={amountNumber === value} key={value} onClick={() => setAmount(String(value))} className={cn("rounded-xl border bg-white px-2 py-3 text-xs", amountNumber === value && "border-primary bg-accent text-primary")}>{formatRupiah(value)}</button>)}
+          </div>
+          <form className="space-y-3" onSubmit={event => {
+            event.preventDefault();
+            if (!validTopup) return;
+            setTopupOpen(false);
+            setIntent({ kind: "topup", amount: amountNumber, requestId: crypto.randomUUID() });
+          }}>
+            <label className="block text-sm" htmlFor="topup">Nominal lainnya</label>
+            <input id="topup" type="number" min={MIN_TOPUP} max={MAX_TOPUP} step={1} required value={amount} onChange={event => setAmount(event.target.value)} className={fieldClass} />
+            <Button type="submit" size="pill" className="w-full" disabled={!validTopup}>Lanjutkan</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!intent || !!current} onOpenChange={open => { if (!open) closePayment(); }}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-[24px]" showCloseButton={!busy}>
+          <DialogHeader>
+            <DialogTitle>{current ? transactionTitle(current) : plan ? `Paket Shield ${plan.name}` : "Top-up Saldo Gleans"}</DialogTitle>
+            <DialogDescription>{current ? current.id : plan && intent?.kind === "package" && intent.method === "balance" ? "Total akan dipotong dari Saldo Gleans Sandbox." : "Pembayaran melalui QRIS Duitku Sandbox."}</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-between gap-3 rounded-xl bg-surface p-3 text-sm font-semibold">
+            <span>Total</span><span>{formatRupiah(current?.amount ?? (intent?.kind === "topup" ? intent.amount : plan?.price ?? 0))}</span>
+          </div>
+          {actionError && <p role="alert" className="text-sm text-destructive">{actionError}</p>}
+          {current ? (
+            <>
+              <p role="status" className="text-center text-sm">{statuses[current.status]}</p>
+              {current.status === "pending" && current.qr_string && <QRCodeSVG value={current.qr_string} size={220} marginSize={4} title="QRIS pembayaran Sandbox Duitku" role="img" className="mx-auto h-auto max-w-full" />}
+              {current.status === "pending" && current.payment_url && <Button asChild size="pill"><a href={current.payment_url} target="_blank" rel="noreferrer">Buka Halaman QRIS Duitku</a></Button>}
+              {["pending", "creating"].includes(current.status) && <Button size="pill" variant="outline" disabled={busy} onClick={() => void check()}>{busy && <Loader2 aria-hidden="true" className="motion-safe:animate-spin" />}Periksa Status Pembayaran</Button>}
+            </>
+          ) : <Button size="pill" disabled={!intent || busy} onClick={() => void purchase()}>{busy && <Loader2 aria-hidden="true" className="motion-safe:animate-spin" />}Bayar Sekarang</Button>}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 }

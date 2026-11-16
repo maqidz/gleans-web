@@ -21,6 +21,7 @@ export function allowedPaymentUrl(value: string) {
 export class InvoiceRejected extends Error {
   constructor(public readonly publicMessage = "Pembayaran QRIS belum dapat dibuat. Silakan coba kembali beberapa saat lagi.") { super("INVOICE_REJECTED"); }
 }
+class PaymentChannelUnavailable extends InvoiceRejected {}
 export function callbackOrigin() {
   const base = process.env.DUITKU_PUBLIC_URL || process.env.NEXT_PUBLIC_APP_URL;
   if (!base) throw new Error("PAYMENTS_UNAVAILABLE");
@@ -34,9 +35,14 @@ async function post(path: string, payload: Record<string, unknown>) {
     cache: "no-store", signal: AbortSignal.timeout(20_000),
   });
   if (!response.ok) {
-    if (path === "v2/inquiry" && [400, 401, 403, 422].includes(response.status)) {
+    if (path === "v2/inquiry" && [400, 401, 403, 404, 422].includes(response.status)) {
       const error = await response.json().catch(() => ({}));
-      const minimum = typeof error.Message === "string" ? error.Message.match(/^Minimum Payment (\d+) IDR$/i)?.[1] : null;
+      const message = error.Message ?? error.message;
+      if (response.status === 404) {
+        if (typeof message === "string" && /^payment channel not available\.?$/i.test(message.trim())) throw new PaymentChannelUnavailable();
+        throw new Error("GATEWAY_UNAVAILABLE");
+      }
+      const minimum = typeof message === "string" ? message.match(/^Minimum Payment (\d+) IDR$/i)?.[1] : null;
       throw new InvoiceRejected(minimum ? `QRIS membutuhkan pembayaran minimal Rp ${Number(minimum).toLocaleString("id-ID")}. Buat pesanan baru tanpa promo atau hubungi support.` : undefined);
     }
     throw new Error("GATEWAY_UNAVAILABLE");
@@ -57,23 +63,48 @@ export function selectQrisMethod(methods: Awaited<ReturnType<typeof paymentMetho
   if (!method) throw new Error("QRIS_UNAVAILABLE");
   return method;
 }
-export async function createInvoice(order: { id: string; amount: number; document_name: string }, method: string, customer: { email: string; name: string; whatsapp: string }) {
+export async function createInvoice(
+  order: { id: string; amount: number; productName?: string; returnPath?: string },
+  method: string,
+  customer: { email: string; name: string; whatsapp: string },
+) {
   if (!isQrisMethod(method)) throw new Error("QRIS_ONLY");
   const { merchantCode, apiKey } = duitkuConfig();
   const origin = callbackOrigin();
   const data = await post("v2/inquiry", {
     merchantCode, paymentAmount: order.amount, paymentMethod: method, merchantOrderId: order.id,
-    productDetails: "Gleans Shield — Sandbox", customerVaName: customer.name.slice(0, 20),
+    productDetails: order.productName ?? "Gleans Shield — Sandbox", customerVaName: customer.name.slice(0, 20),
     ...(customer.email ? { email: customer.email } : {}), phoneNumber: customer.whatsapp,
-    itemDetails: [{ name: "Pemeriksaan dokumen Gleans Shield (Sandbox)", price: order.amount, quantity: 1 }],
+    itemDetails: [{ name: order.productName ?? "Pemeriksaan dokumen Gleans Shield (Sandbox)", price: order.amount, quantity: 1 }],
     callbackUrl: new URL("/api/payments/duitku/callback", origin).toString(),
-    returnUrl: new URL(`/pembayaran?order=${order.id}`, origin).toString(),
+    returnUrl: new URL(order.returnPath ?? `/pembayaran?order=${order.id}`, origin).toString(),
     signature: signature(`${merchantCode}${order.id}${order.amount}`, apiKey), expiryPeriod: 60,
   });
   if (data.statusCode !== "00") throw new InvoiceRejected();
   if (data.merchantCode !== merchantCode || Number(data.amount) !== order.amount || !allowedPaymentUrl(data.paymentUrl)) throw new Error("INVALID_GATEWAY_RESPONSE");
   return z.object({ reference: z.string().min(1), paymentUrl: z.string().url(), qrString: z.string().optional().nullable() }).parse(data);
 }
+
+export async function createQrisInvoice(order: Parameters<typeof createInvoice>[0], customer: Parameters<typeof createInvoice>[2]) {
+  // Nobu is enabled for Gleans and Duitku accepts its code directly at inquiry.
+  const preferredMethod = "NQ";
+  try {
+    return { ...await createInvoice(order, preferredMethod, customer), method: preferredMethod };
+  } catch (error) {
+    if (!(error instanceof PaymentChannelUnavailable)) throw error;
+  }
+
+  let method: string;
+  try {
+    const available = await paymentMethods(order.amount);
+    method = selectQrisMethod(available.filter(channel => channel.paymentMethod !== preferredMethod)).paymentMethod;
+  } catch {
+    // The first inquiry was explicitly rejected. The order can safely return to draft.
+    throw new InvoiceRejected("QRIS belum tersedia. Silakan coba kembali beberapa saat lagi.");
+  }
+  return { ...await createInvoice(order, method, customer), method };
+}
+
 export async function transactionStatus(orderId: string) {
   const { merchantCode, apiKey } = duitkuConfig();
   const data = await post("transactionStatus", { merchantCode, merchantOrderId: orderId, signature: signature(`${merchantCode}${orderId}`, apiKey) });

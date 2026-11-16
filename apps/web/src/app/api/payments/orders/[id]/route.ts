@@ -2,7 +2,7 @@ import { z } from "zod";
 import { orderAccess } from "@/features/payments/server/guest";
 import { allowOrderLookup } from "@/features/payments/server/lookup-limit";
 import { dashboardUser } from "@/features/auth/server";
-import { createInvoice, paymentMethods, callbackOrigin, InvoiceRejected, selectQrisMethod } from "@/features/payments/server/duitku";
+import { createQrisInvoice, callbackOrigin, duitkuConfig, InvoiceRejected } from "@/features/payments/server/duitku";
 import { findOrder, ORDER_COLUMNS, paymentAdmin, publicOrder } from "@/features/payments/server/repository";
 import { reconcilePayment } from "@/features/payments/server/service";
 import { json, paymentError, sameOrigin } from "@/features/payments/server/http";
@@ -13,7 +13,7 @@ export async function GET(request: Request, context: Context) {
     if (!await allowOrderLookup(request, "checkout")) return json({ error: "Terlalu banyak permintaan. Coba kembali dalam satu menit." }, 429);
     const order = await findOrder((await context.params).id);
     if (!order) return json({ error: "Pesanan tidak ditemukan." }, 404);
-    const access = await orderAccess(order, (await dashboardUser())?.id);
+    const access = await orderAccess(order, order.owner_id ? (await dashboardUser())?.id : undefined);
     return json({ order: { ...publicOrder(order), has_access: access.allowed, can_download: access.allowed && order.status === "paid" && order.fulfillment_status === "completed" && Date.parse(order.report_expires_at ?? "") > Date.now(), access_code: access.code } });
   } catch (error) { return paymentError(error); }
 }
@@ -37,13 +37,13 @@ export async function POST(request: Request, context: Context) {
       }
     } else if (order.status === "draft") {
       callbackOrigin();
-      const method = selectQrisMethod(await paymentMethods(order.amount));
-      const { data: claimed, error } = await admin.database.from("duitku_orders").update({ status: "creating", payment_method: method.paymentMethod, expires_at: new Date(Date.now() + 3600_000).toISOString() }).eq("id", order.id).eq("status", "draft").select("id");
+      duitkuConfig();
+      const { data: claimed, error } = await admin.database.from("duitku_orders").update({ status: "creating", expires_at: new Date(Date.now() + 3600_000).toISOString() }).eq("id", order.id).eq("status", "draft").select("id");
       if (error) throw new Error("DATABASE_UNAVAILABLE");
       if (!claimed?.length) return json({ error: "Pembayaran sedang dibuat. Muat ulang pesanan." }, 409);
       try {
-        const invoice = await createInvoice(order, method.paymentMethod, { email: order.email, name: order.customer_name, whatsapp: order.whatsapp });
-        const { data: saved, error: saveError } = await admin.database.from("duitku_orders").update({ status: "pending", payment_url: invoice.paymentUrl, reference: invoice.reference, qr_string: invoice.qrString ?? null }).eq("id", order.id).eq("status", "creating").select(ORDER_COLUMNS).maybeSingle();
+        const invoice = await createQrisInvoice(order, { email: order.email, name: order.customer_name, whatsapp: order.whatsapp });
+        const { data: saved, error: saveError } = await admin.database.from("duitku_orders").update({ status: "pending", payment_method: invoice.method, payment_url: invoice.paymentUrl, reference: invoice.reference, qr_string: invoice.qrString ?? null }).eq("id", order.id).eq("status", "creating").select(ORDER_COLUMNS).maybeSingle();
         if (saveError) throw new Error("DATABASE_UNAVAILABLE");
         if (saved) return json({ order: publicOrder(saved) });
       } catch (error) {

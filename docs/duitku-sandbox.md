@@ -1,6 +1,6 @@
 # Duitku Sandbox checkout
 
-Sandbox only: any other `DUITKU_ENV` disables payment requests. The app supports account and guest checkout, public order lookup, and private downloads of reports uploaded by the configured admin. Detection is not automated; payment alone never creates a report, credits a balance, or adds quota.
+Sandbox only. The app supports account and guest checkout, public order lookup, and private downloads of reports uploaded by the configured admin. Detection is not automated.
 
 ## Configuration
 
@@ -19,6 +19,8 @@ Apply migrations in order, first on an isolated backend branch:
 3. `20261020025949_public-order-lookup-limits.sql`
 4. `20261020032838_guest-checkout-reports.sql`
 5. `20261020043035_guest-upload-quotas.sql`
+6. `20261113090000_shield-file-retention.sql`
+7. `20261116053000_duitku-billing.sql`
 
 The private bucket `shield-sandbox-documents` must exist. Never make it public. Review branch merge previews; user rows and uploaded QA files must not be migrated. Public callback delivery still requires deployment and merchant callback configuration. This branch has not been deployed or merged to Git main automatically.
 
@@ -30,6 +32,12 @@ The private bucket `shield-sandbox-documents` must exist. Never make it public. 
 4. New invoice numbers use `GLS-` plus 12 cryptographically random uppercase hex characters. The primary key enforces uniqueness and the server retries three ID candidates on primary-key collisions only. Legacy UUID invoices are unchanged.
 5. QRIS only: active channel priority SQ, NQ, SP. No VA/card fallback. The page supports pay and status checks without login. Gateway callbacks and manual checks independently query Duitku; return URL fields never prove payment. Explicit invoice rejection allows retry; ambiguous failures remain `creating` to prevent duplicates.
 6. A 256-bit per-order access code is derived from the guest secret and stored only as a hash. The originating browser automatically has download access. “Salin tautan akses” gives a private link with the code in its URL fragment, never the query string. The checkout exchanges that code for an httpOnly, order-specific cookie and removes the fragment. A customer on another device can use that link/code without creating an account.
+
+## Paket & Saldo
+
+Signed-in users can top up through Sandbox QRIS or buy Shield packages with QRIS or Sandbox balance. The server sets the amount and quota from the package catalog. Top-ups and QRIS package purchases are credited once, after the server verifies the amount, merchant order ID, reference, and status with Duitku. Local checkout supports manual status checks. Automatic callbacks require a public URL serving the billing callback code.
+
+The Sandbox balance and quota start at zero. They are stored per account in the database and can be used at Shield checkout. Purchases and debits create history entries in Paket & Saldo. The dashboard demo reset only affects browser data.
 
 ## Lookup and downloads
 

@@ -1,18 +1,23 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
-import { Check, Clock3, Info, Loader2, RotateCcw } from "lucide-react";
+import { Check, Info, Loader2, RotateCcw } from "lucide-react";
 import { Button } from "@gleans/ui/button";
+import { PageIntro } from "@/components/layout/section-heading";
+import { PRODUCTS } from "@/config/site";
 import { formatRupiah } from "@/lib/format";
 import type { PaymentOrder } from "../types";
-import { clearCheckoutTransition, getCheckoutTransition, requestPaymentAction } from "../checkout-transition";
-const labels = { draft: "Pembayaran QRIS", creating: "Menyiapkan Pembayaran", pending: "Menunggu Pembayaran", paid: "Pembayaran Berhasil", failed: "Pembayaran Gagal", expired: "Pembayaran Kedaluwarsa" };
+import { clearCheckoutTransition, getCheckoutTransition, requestPaymentAction, startCheckoutTransition, type CheckoutPreview } from "../checkout-transition";
+const labels = { draft: "Belum dibayar", creating: "Transaksi belum dikonfirmasi", pending: "Menunggu Pembayaran", paid: "Pembayaran Berhasil", failed: "Pembayaran Gagal", expired: "Pembayaran Kedaluwarsa" };
 export function PaymentCheckout() {
-  const id = useSearchParams().get("order");
+  const params = useSearchParams();
+  const id = params.get("order");
+  const requestId = params.get("checkout");
   const [order, setOrder] = useState<PaymentOrder | null>(null);
+  const [preview, setPreview] = useState<CheckoutPreview | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -38,18 +43,41 @@ export function PaymentCheckout() {
   }, [id]);
   useEffect(() => {
     // Explicit recovery links always run through access verification.
-    const transition = window.location.hash ? undefined : getCheckoutTransition(id);
-    if (!transition || !id) { void load(); return; }
+    const transition = window.location.hash ? undefined : getCheckoutTransition(id, requestId);
+    if (!transition) {
+      setPreview(null);
+      if (!id && requestId) {
+        setError("Buka kembali formulir untuk melanjutkan pesanan.");
+        setLoaded(true);
+        setBusy(false);
+      } else {
+        void load();
+      }
+      return;
+    }
     let active = true;
-    setOrder(transition.order);
-    setLoaded(true);
+    setPreview(transition.preview);
     setBusy(true);
     setError("");
+    if (!id) {
+      void transition.reservation.then(reserved => {
+        if (!active) return;
+        setOrder(reserved);
+        window.history.replaceState(null, "", `/pembayaran?order=${encodeURIComponent(reserved.id)}`);
+      }, error => {
+        if (!active) return;
+        setError(error instanceof Error ? error.message : "Tidak dapat membuka pembayaran.");
+        setBusy(false);
+      });
+      return () => { active = false; };
+    }
+    setOrder(transition.order ?? null);
+    setLoaded(true);
     void transition.result.then(async result => {
       if (!active) return;
       clearCheckoutTransition(id);
       if ("order" in result && result.order.status !== "paid") {
-        setOrder({ ...result.order, access_code: transition.order.access_code });
+        setOrder({ ...result.order, access_code: transition.order?.access_code });
       } else {
         await load();
         if (active && "error" in result) setError(result.error);
@@ -57,19 +85,26 @@ export function PaymentCheckout() {
       if (active) setBusy(false);
     });
     return () => { active = false; };
-  }, [id, load]);
+  }, [id, requestId, attempt, load]);
   useEffect(() => { if (!cooldown) return; const timer = setTimeout(() => setCooldown(value => value - 1), 1000); return () => clearTimeout(timer); }, [cooldown]);
+  function retryReservation() {
+    const transition = getCheckoutTransition(null, requestId);
+    if (!transition || busy) return;
+    startCheckoutTransition(transition.requestId, transition.preview, transition.reserve);
+    setAttempt(value => value + 1);
+  }
   async function act(action: "pay" | "check") {
     if (!id || busy) return;
     setBusy(true); setError("");
     try {
       const updated = await requestPaymentAction(id, action);
-      if (action === "check" || updated.status === "paid") {
+      if (updated.status === "paid") {
+        setOrder({ ...updated, access_code: order?.access_code, has_access: order?.has_access, can_download: order?.can_download });
         await load();
-        if (action === "check") setCooldown(30);
       } else {
         setOrder({ ...updated, access_code: order?.access_code, has_access: order?.has_access });
       }
+      if (action === "check") setCooldown(30);
     } catch (error) {
       if (action === "pay") await load();
       setError(error instanceof Error ? error.message : "Tidak dapat memproses pembayaran.");
@@ -88,40 +123,156 @@ export function PaymentCheckout() {
     try { await navigator.clipboard.writeText(`${window.location.origin}/pembayaran?order=${encodeURIComponent(order.id)}#access=${encodeURIComponent(order.access_code)}`); setNotice("Tautan akses disalin. Simpan secara pribadi untuk mengunduh hasil di perangkat lain."); }
     catch { setNotice(`Simpan kode akses ini secara pribadi: ${order.access_code}`); }
   }
-  return <div className="w-full max-w-[460px]">
-    <p className="mb-4 flex items-start gap-2 rounded-2xl bg-amber-50 p-4 text-sm text-amber-800"><Info aria-hidden="true" className="mt-0.5 size-4 shrink-0" />Mode Sandbox Duitku. Gunakan simulasi pembayaran; hasil tersedia setelah admin mengunggah laporan pemeriksaan.</p>
-    <section aria-label="Pembayaran QRIS Duitku" className="rounded-[24px] border bg-white p-4 sm:p-5">
-      <div className="mx-auto flex size-[68px] items-center justify-center rounded-2xl border"><Image src="/images/logo-gleans-shield.svg" alt="Gleans Shield" width={36} height={36} /></div>
-      <h1 className="mt-6 text-center text-2xl font-semibold">{order ? (order.status === "draft" && busy ? labels.creating : labels[order.status]) : loaded ? "Pembayaran Gleans Shield" : "Memuat pembayaran…"}</h1>
-      {error && <p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
-      {notice && <p role="status" className="mt-4 break-all text-sm text-primary">{notice}</p>}
-      {!id && <p className="mt-4 text-center text-sm text-muted-foreground">Buat pesanan terlebih dahulu untuk melanjutkan pembayaran.</p>}
-      {order && <>
-        {order.status === "draft" && (busy
-          ? <p role="status" className="mt-4 flex items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" />Menyiapkan kode QR di Duitku…</p>
-          : <p className="mt-4 text-center text-sm text-muted-foreground">Pembayaran menggunakan QRIS. Kode QR akan dibuat sesuai total pesananmu.</p>)}
-        {order.status === "pending" && <div className="my-6 flex flex-col items-center gap-3">
-          {order.qr_string && <div className="rounded-2xl border bg-white p-4 text-center"><QRCodeSVG value={order.qr_string} size={220} level="M" title="QRIS pembayaran Sandbox Duitku" /></div>}
-
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><Clock3 className="size-3.5" />Menunggu konfirmasi Duitku</span>
-        </div>}
-        {order.status === "paid" && <div className="my-6 flex justify-center"><Check className="size-12 rounded-full bg-emerald-50 p-2 text-emerald-600" aria-label="Pembayaran terverifikasi" /></div>}
-        {order.status === "creating" && <p className="mt-4 text-sm text-muted-foreground">Transaksi sedang dikonfirmasi. Periksa status sebelum membuat pesanan baru. Jika tetap belum berubah, hubungi support dengan ID transaksi.</p>}
-        <dl className="mt-6 space-y-3 text-sm"><div className="flex justify-between gap-4"><dt>Dokumen</dt><dd className="min-w-0 break-words text-right">{order.document_name}</dd></div><div className="flex justify-between gap-4"><dt className="shrink-0">Nomor Invoice</dt><dd className="min-w-0 break-all text-right">{order.id}</dd></div><div className="flex justify-between gap-4"><dt>Status</dt><dd>{labels[order.status]}</dd></div>{order.expires_at && <div className="flex justify-between gap-4"><dt>Batas pembayaran</dt><dd className="text-right">{new Date(order.expires_at).toLocaleString("id-ID")}</dd></div>}<div className="flex justify-between gap-4 text-base font-semibold"><dt>Total pesanan</dt><dd>{formatRupiah(order.amount)}</dd></div></dl>
-        {order.status === "paid" && <div className="mt-5 rounded-2xl bg-surface p-4 text-sm">
-          <p className="font-medium">{order.fulfillment_status === "completed" ? "Pemeriksaan selesai" : order.fulfillment_status === "processing" ? "Dokumen sedang diperiksa" : order.fulfillment_status === "failed" ? "Pemeriksaan perlu ditinjau" : order.status === "paid" ? "Menunggu pemeriksaan" : "Pemeriksaan dimulai setelah pembayaran"}</p>
-          {order.report_expires_at && <p className="mt-1 text-xs text-muted-foreground">Batas unduh: {new Date(order.report_expires_at).toLocaleString("id-ID")}</p>}
-          {order.can_download && <Button asChild size="pill" className="mt-3 w-full"><a href={`/api/payments/orders/${encodeURIComponent(order.id)}/report`}>Unduh hasil PDF</a></Button>}
-          {order.fulfillment_status === "completed" && order.report_expires_at && Date.parse(order.report_expires_at) <= Date.now() && <p className="mt-2 text-xs text-destructive">Masa unduh 24 jam telah berakhir.</p>}
-          {order.access_code ? <Button variant="outline" size="pill-sm" className="mt-3" onClick={() => void copyAccess()}>Salin tautan akses</Button> : order.fulfillment_status === "completed" && !order.has_access && <div className="mt-3 space-y-2"><label htmlFor="order-access" className="block text-xs">Kode akses pesanan (untuk unduh di perangkat lain)</label><input id="order-access" type="password" maxLength={43} spellCheck={false} autoComplete="off" value={recoveryCode} onChange={event => setRecoveryCode(event.target.value)} className="h-10 w-full rounded-xl border bg-white px-3 text-sm" /><Button size="pill-sm" variant="outline" disabled={busy || !recoveryCode.trim()} onClick={() => void restoreAccess()}>Buka akses unduh</Button></div>}
-        </div>}
-        {order.status === "draft" && !busy && <Button size="pill" className="mt-6 w-full" onClick={() => void act("pay")}>Tampilkan QRIS</Button>}
-        {order.status === "pending" && order.payment_url && <Button asChild size="pill" className="mt-6 w-full"><a href={order.payment_url} target="_blank" rel="noopener noreferrer">Buka Halaman QRIS Duitku</a></Button>}
-        {order.status === "paid" && order.fulfillment_status !== "completed" && <Button variant="outline" size="pill" className="mt-3 w-full" onClick={() => void load()}>Perbarui status pemeriksaan</Button>}
-        {["pending", "creating"].includes(order.status) && <Button variant="outline" size="pill" className="mt-3 w-full" disabled={busy || cooldown > 0} onClick={() => void act("check")}><RotateCcw className={busy ? "animate-spin" : ""} />{cooldown ? `Periksa lagi dalam ${cooldown} detik` : "Periksa Status Pembayaran"}</Button>}
+  const summary = order ?? preview;
+  const method = order?.payment_method ?? preview?.method;
+  const wallet = method === "balance" || method === "quota";
+  const qrCode = order?.status === "pending" ? order.qr_string : null;
+  const waitingForQr = !wallet && !error && (
+    (!order && !loaded && Boolean(id || requestId)) ||
+    (busy && (!order || order.status === "draft"))
+  );
+  return (
+    <PaymentLayout
+      title={wallet ? "Pembayaran Gleans Shield" : undefined}
+      wallet={wallet}
+      panelTitle={order?.status === "paid" ? "Hasil pemeriksaan" : wallet ? "Pembayaran" : "Kode QRIS"}
+      summary={<>
+        {summary && (
+          <section aria-labelledby="order-summary-title" className="border-t pt-6">
+            <h2 id="order-summary-title" className="text-lg font-semibold">Ringkasan Pesanan</h2>
+            <dl className="mt-5 space-y-3.5 text-sm">
+              <SummaryRow label="Dokumen">{summary.document_name}</SummaryRow>
+              <SummaryRow label="Nomor Invoice">{order?.id ?? "—"}</SummaryRow>
+              <SummaryRow label="Status">
+                <span role="status">{labels[order?.status ?? "draft"]}</span>
+              </SummaryRow>
+              {order?.expires_at && (
+                <SummaryRow label="Batas pembayaran">{new Date(order.expires_at).toLocaleString("id-ID")}</SummaryRow>
+              )}
+              <div className="flex items-center justify-between gap-4 border-t pt-4">
+                <dt className="font-medium">Total pembayaran</dt>
+                <dd className="text-2xl font-semibold tracking-tight tabular-nums">{method === "quota" ? "1 kuota Shield" : formatRupiah(summary.amount)}</dd>
+              </div>
+            </dl>
+          </section>
+        )}
+        {!id && !requestId && <p className="text-sm text-muted-foreground">Buat pesanan terlebih dahulu untuk melanjutkan pembayaran.</p>}
+        <Link href={order ? "/cek-pesanan" : "/deteksi-ai"} className="w-fit text-sm font-medium text-primary hover:underline">
+          {order ? "Lihat pesanan saya" : "Buat pesanan"}
+        </Link>
       </>}
-      {!order && id && loaded && <Button variant="outline" className="mt-4 w-full" onClick={() => void load()}>Muat Ulang</Button>}
-      <Link href={order ? "/cek-pesanan" : "/deteksi-ai"} className="mt-6 block text-center text-sm text-primary">{order ? "Lihat pesanan saya" : "Buat pesanan"}</Link>
-    </section>
-  </div>;
+    >
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      {notice && <p role="status" className="break-all text-sm text-primary">{notice}</p>}
+      {wallet && busy && order?.status !== "paid" && !error && (
+        <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" /> Memverifikasi pembayaran
+        </p>
+      )}
+      {(qrCode || waitingForQr) && (
+        <div className="mx-auto w-full max-w-[266px] rounded-2xl border bg-white p-2">
+          <div className="grid aspect-square place-items-center">
+            {qrCode ? (
+              <QRCodeSVG
+                value={qrCode}
+                size={248}
+                marginSize={4}
+                level="M"
+                title="QRIS pembayaran Sandbox Duitku"
+                role="img"
+                className="h-auto w-full"
+              />
+            ) : (
+              <div role="status">
+                <Loader2 aria-hidden="true" className="size-8 text-primary motion-safe:animate-spin" />
+                <span className="sr-only">Memuat kode QRIS</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {order?.status === "creating" && (
+        <p className="text-sm text-muted-foreground">Transaksi belum dikonfirmasi. Periksa status atau hubungi support dengan nomor invoice.</p>
+      )}
+      {order?.status === "paid" && (
+        <div className="space-y-3 text-sm">
+          <p className="flex items-center gap-2 font-medium text-emerald-700">
+            <Check className="size-5" aria-hidden="true" /> Pembayaran terverifikasi
+          </p>
+          <p className="font-medium">{order.fulfillment_status === "completed" ? "Pemeriksaan selesai" : order.fulfillment_status === "processing" ? "Dokumen sedang diperiksa" : order.fulfillment_status === "failed" ? "Pemeriksaan perlu ditinjau" : "Menunggu pemeriksaan"}</p>
+          {order.report_expires_at && <p className="text-xs text-muted-foreground">Batas unduh: {new Date(order.report_expires_at).toLocaleString("id-ID")}</p>}
+          {order.can_download && <Button asChild size="pill" className="w-full"><a href={`/api/payments/orders/${encodeURIComponent(order.id)}/report`}>Unduh hasil PDF</a></Button>}
+          {order.fulfillment_status === "completed" && order.report_expires_at && Date.parse(order.report_expires_at) <= Date.now() && <p className="text-xs text-destructive">Masa unduh 24 jam telah berakhir.</p>}
+          {order.access_code ? (
+            <Button variant="outline" size="pill-sm" onClick={() => void copyAccess()}>Salin tautan akses</Button>
+          ) : order.fulfillment_status === "completed" && !order.has_access && (
+            <div className="space-y-2">
+              <label htmlFor="order-access" className="block text-xs">Kode akses pesanan (untuk unduh di perangkat lain)</label>
+              <input id="order-access" type="password" maxLength={43} spellCheck={false} autoComplete="off" value={recoveryCode} onChange={event => setRecoveryCode(event.target.value)} className="h-10 w-full rounded-xl border bg-white px-3 text-sm" />
+              <Button size="pill-sm" variant="outline" disabled={busy || !recoveryCode.trim()} onClick={() => void restoreAccess()}>Buka akses unduh</Button>
+            </div>
+          )}
+          {order.fulfillment_status !== "completed" && <Button variant="outline" size="pill" className="w-full" onClick={() => void load()}>Perbarui status pemeriksaan</Button>}
+        </div>
+      )}
+      {order?.status === "draft" && !busy && <Button size="pill" className="w-full" onClick={() => void act("pay")}>Tampilkan QRIS</Button>}
+      {order?.status === "pending" && order.payment_url && (
+        <Button asChild size="pill" className="w-full"><a href={order.payment_url} target="_blank" rel="noopener noreferrer">Buka Halaman QRIS Duitku</a></Button>
+      )}
+      {(order?.status === "pending" || order?.status === "creating") && (
+        <Button variant="outline" size="pill" className="w-full" disabled={busy || cooldown > 0} onClick={() => void act("check")}>
+          <RotateCcw aria-hidden="true" className={busy ? "motion-safe:animate-spin" : ""} />
+          {cooldown ? `Periksa lagi dalam ${cooldown} detik` : "Periksa Status Pembayaran"}
+        </Button>
+      )}
+      {!id && requestId && preview && error && <Button variant="outline" className="w-full" onClick={retryReservation}>Coba Lagi</Button>}
+      {!order && id && loaded && (
+        <Button variant="outline" className="w-full" onClick={() => {
+          setError("");
+          setLoaded(false);
+          void load();
+        }}>Muat Ulang</Button>
+      )}
+    </PaymentLayout>
+  );
+}
+
+function SummaryRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-[minmax(8rem,0.85fr)_minmax(0,1.15fr)] gap-3">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 text-right font-medium [overflow-wrap:anywhere]">{children}</dd>
+    </div>
+  );
+}
+
+export function PaymentLayout({
+  summary,
+  title = "Pembayaran QRIS",
+  wallet = false,
+  panelTitle = "Kode QRIS",
+  children,
+}: {
+  summary?: React.ReactNode;
+  title?: string;
+  wallet?: boolean;
+  panelTitle?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="container-page grid items-start gap-8 py-8 sm:py-12 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:gap-16 lg:py-[60px]">
+      <div className="flex min-w-0 flex-col gap-6 sm:gap-8">
+        <PageIntro title={title} badge={{ icon: PRODUCTS[0].icon, label: PRODUCTS[0].tag }} />
+        {summary}
+      </div>
+      <section aria-labelledby="qris-panel-title" className="flex min-w-0 flex-col gap-4 rounded-[24px] border bg-surface p-5 sm:p-6 lg:p-8">
+        <h2 id="qris-panel-title" className="text-lg font-semibold sm:text-xl">{panelTitle}</h2>
+        <p className="flex items-start gap-2 text-sm text-muted-foreground">
+          <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          {wallet ? "Saldo dan kuota Sandbox hanya untuk pengujian." : "Duitku Sandbox. Pembayaran hanya simulasi."}
+        </p>
+        {children}
+      </section>
+    </div>
+  );
 }

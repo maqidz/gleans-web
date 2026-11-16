@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Navbar } from "@/components/layout/navbar";
 import { Breadcrumb } from "@/components/layout/breadcrumb";
-import { PaymentCheckout } from "@/features/payments/components/checkout";
+import { PaymentCheckout, PaymentLayout } from "@/features/payments/components/checkout";
 
 export const metadata: Metadata = { title: "Pembayaran Gleans Shield" };
 
@@ -10,8 +10,8 @@ export default function PaymentPage() {
   return <div className="flex min-h-dvh flex-col bg-white">
     <Navbar />
     <Breadcrumb items={[{ label: "Gleans Shield", href: "/deteksi-ai" }, { label: "Pembayaran" }]} />
-    <main className="flex flex-1 items-start justify-center px-4 py-10 sm:py-12">
-      <Suspense fallback={<p>Memuat pembayaran…</p>}><PaymentCheckout /></Suspense>
+    <main className="flex-1">
+      <Suspense fallback={<PaymentLayout />}><PaymentCheckout /></Suspense>
     </main>
   </div>;
 }

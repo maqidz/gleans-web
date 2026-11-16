@@ -117,6 +117,83 @@ test('invoice adapter refuses a non-QRIS payment even if called directly',async(
   await assert.rejects(()=>gateway.createInvoice({id:'GLS-test',amount:10000,document_name:'paper.txt'},'VA',{email:'test@example.invalid',name:'Tester',whatsapp:'08123456789'}),/QRIS_ONLY/);
 });
 
+test('Gleans requests Nobu QRIS directly and discovers alternatives only after an explicit channel rejection', async () => {
+  const previous = {...process.env};
+  const originalFetch = globalThis.fetch;
+  Object.assign(process.env, {
+    DUITKU_ENV: 'sandbox', DUITKU_MERCHANT_CODE: 'DS123', DUITKU_API_KEY: 'test-secret',
+    DUITKU_PUBLIC_URL: 'https://shop.example.test'
+  });
+  const order = {id: 'GLS-test', amount: 8000, document_name: 'paper.txt'};
+  const customer = {email: '', name: 'Tester', whatsapp: '08123456789'};
+  const calls = [];
+  const invoice = {statusCode: '00', statusMessage: 'SUCCESS', merchantCode: 'DS123', amount: '8000', reference: 'ref', paymentUrl: 'https://sandbox.duitku.com/pay', qrString: 'test-qr'};
+  let mode = 'success';
+  globalThis.fetch = async (url, init) => {
+    const payload = JSON.parse(init.body);
+    if (url.endsWith('/getpaymentmethod')) {
+      calls.push('channels');
+      return Response.json({responseCode: '00', paymentFee: [
+        {paymentMethod: 'NQ', paymentName: 'Nobu', totalFee: '0'},
+        {paymentMethod: 'SP', paymentName: 'ShopeePay', totalFee: '0'},
+      ]});
+    }
+    calls.push(payload.paymentMethod);
+    assert.equal(payload.merchantOrderId, order.id);
+    if (mode === 'timeout') throw new DOMException('Timeout', 'TimeoutError');
+    if (mode === 'missing-merchant') return Response.json({Message: 'Merchant not found'}, {status: 404});
+    if (mode === 'inactive-channel' && payload.paymentMethod === 'NQ') {
+      return Response.json({Message: 'Payment channel not available'}, {status: 404});
+    }
+    return Response.json(invoice);
+  };
+  try {
+    assert.equal((await gateway.createQrisInvoice(order, customer)).method, 'NQ');
+    assert.deepEqual(calls.splice(0), ['NQ']);
+    mode = 'inactive-channel';
+    assert.equal((await gateway.createQrisInvoice(order, customer)).method, 'SP');
+    assert.deepEqual(calls.splice(0), ['NQ', 'channels', 'SP']);
+    mode = 'timeout';
+    await assert.rejects(() => gateway.createQrisInvoice(order, customer), {name: 'TimeoutError'});
+    assert.deepEqual(calls.splice(0), ['NQ']);
+    mode = 'missing-merchant';
+    await assert.rejects(() => gateway.createQrisInvoice(order, customer), /GATEWAY_UNAVAILABLE/);
+    assert.deepEqual(calls.splice(0), ['NQ']);
+  } finally {
+    globalThis.fetch = originalFetch;
+    process.env = previous;
+  }
+});
+
+
+test('billing invoices use the dashboard return URL and keep the verified callback', async () => {
+  const previous = {...process.env};
+  const originalFetch = globalThis.fetch;
+  Object.assign(process.env, {
+    DUITKU_ENV: 'sandbox', DUITKU_MERCHANT_CODE: 'DS123', DUITKU_API_KEY: 'test-secret',
+    DUITKU_PUBLIC_URL: 'https://shop.example.test'
+  });
+  const id = 'GLB-AAAAAAAAAAAAAAAAAAAAAAAA';
+  globalThis.fetch = async (url, init) => {
+    assert.match(url, /\/v2\/inquiry$/);
+    const payload = JSON.parse(init.body);
+    assert.equal(payload.productDetails, 'Top-up Saldo Gleans');
+    assert.deepEqual(payload.itemDetails, [{name: 'Top-up Saldo Gleans', price: 25000, quantity: 1}]);
+    assert.equal(payload.returnUrl, `https://shop.example.test/dashboard/paket-saldo?billing=${id}`);
+    assert.equal(payload.callbackUrl, 'https://shop.example.test/api/payments/duitku/callback');
+    assert.equal(payload.signature, gateway.signature(`DS123${id}25000`, 'test-secret'));
+    return Response.json({statusCode: '00', merchantCode: 'DS123', amount: '25000', reference: 'ref', paymentUrl: 'https://sandbox.duitku.com/pay', qrString: 'test-qr'});
+  };
+  try {
+    const invoice = await gateway.createQrisInvoice({id, amount: 25000, productName: 'Top-up Saldo Gleans',
+      returnPath: `/dashboard/paket-saldo?billing=${id}`}, {email: 'test@example.invalid', name: 'Tester', whatsapp: ''});
+    assert.equal(invoice.qrString, 'test-qr');
+  } finally {
+    globalThis.fetch = originalFetch;
+    process.env = previous;
+  }
+});
+
 test('checkout uses the server-verified identity, including after session refresh, without another browser auth request',async()=>{
   const {checkoutUserId}=await moduleFrom('src/features/orders/lib/checkout-session.ts');
   const id='11111111-1111-4111-8111-111111111111';

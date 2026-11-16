@@ -8,7 +8,7 @@ import { paymentAdmin, ORDER_COLUMNS, publicOrder, type StoredOrder } from "@/fe
 import { guestSession, accessDigest, orderAccessCode } from "@/features/payments/server/guest";
 import { json, paymentError, sameOrigin } from "@/features/payments/server/http";
 export const runtime = "nodejs";
-const schema = z.object({ requestId: z.string().uuid(), ticketId: z.string().uuid(), words: z.number().int().min(0).max(25000), whatsapp: whatsappSchema, email: z.string().trim().email().max(50).optional(), name: z.string().trim().min(1).max(80).optional(), promo: z.string().max(40).optional() }).strict();
+const schema = z.object({ requestId: z.string().uuid(), ticketId: z.string().uuid(), words: z.number().int().min(0).max(25000), whatsapp: whatsappSchema, email: z.string().trim().email().max(50).optional(), name: z.string().trim().min(1).max(80).optional(), promo: z.string().max(40).optional(), method: z.enum(["qris", "balance", "quota"]).default("qris") }).strict();
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return json({ error: "Permintaan tidak diizinkan." }, 403);
   try {
@@ -16,21 +16,34 @@ export async function POST(request: Request) {
     const raw = await request.text(); if (raw.length > 4096) return json({ error: "Data pesanan terlalu besar." }, 413);
     const parsed = schema.safeParse(JSON.parse(raw)); if (!parsed.success) return json({ error: "Data pesanan tidak valid." }, 400);
     const input = parsed.data; const user = await dashboardUser(); const guest = await guestSession();
+    if (input.method !== "qris" && !user) return json({ error: "Masuk untuk menggunakan saldo atau kuota Gleans." }, 401);
     if (!guest) return json({ error: "Unggah dokumen terlebih dahulu." }, 400);
     const email = input.email || user?.email || "";
     const promo = input.promo ? resolvePromo(input.promo, SHIELD_PRICE) : null;
     if (input.promo && !promo) return json({ error: "Kode promo tidak valid." }, 400);
-    const { data, error } = await reserveInvoice(id => paymentAdmin().database.rpc("reserve_guest_order", {
-      p_id: id, p_owner: user?.id ?? null, p_guest: guest.hash, p_access: accessDigest(orderAccessCode(guest.secret, id)), p_request: input.requestId, p_ticket: input.ticketId,
-      p_email: email, p_name: input.name || user?.name || "Pelanggan Gleans", p_whatsapp: input.whatsapp,
-      p_words: input.words, p_amount: SHIELD_PRICE - (promo?.discount ?? 0), p_promo: promo?.code ?? null,
-    }));
+    const admin = paymentAdmin();
+    const { data, error } = await reserveInvoice(id => {
+      const args = {
+        p_id: id, p_owner: user?.id ?? null, p_guest: guest.hash, p_access: accessDigest(orderAccessCode(guest.secret, id)), p_request: input.requestId, p_ticket: input.ticketId,
+        p_email: email, p_name: input.name || user?.name || "Pelanggan Gleans", p_whatsapp: input.whatsapp,
+        p_words: input.words, p_amount: SHIELD_PRICE - (promo?.discount ?? 0), p_promo: promo?.code ?? null,
+      };
+      return input.method === "qris"
+        ? admin.database.rpc("reserve_guest_order", args)
+        : admin.database.rpc("reserve_billed_shield_order", { ...args, p_method: input.method });
+    });
     if (error) {
+      if (error.message.includes("INSUFFICIENT_BALANCE")) return json({ error: "Saldo Gleans belum cukup." }, 409);
+      if (error.message.includes("INSUFFICIENT_QUOTA")) return json({ error: "Kuota Shield sudah habis." }, 409);
+      if (error.message.includes("BILLING_REQUEST_CONFLICT")) return json({ error: "Pesanan ini sudah memakai metode pembayaran lain." }, 409);
       if (error.message.includes("RATE_LIMIT")) return json({ error: "Terlalu banyak pesanan. Lanjutkan pesanan yang sudah ada atau coba lagi nanti." }, 429);
       if (error.message.includes("INVALID_UPLOAD")) return json({ error: "Dokumen tidak valid atau telah digunakan. Silakan unggah kembali." }, 400);
       throw new Error("DATABASE_UNAVAILABLE");
     }
     const order = data as StoredOrder;
+    if (input.method === "qris" && ["balance", "quota"].includes(order.payment_method ?? "")) {
+      return json({ error: "Pesanan ini sudah memakai metode pembayaran lain." }, 409);
+    }
     return json({ order: publicOrder(order), access_code: order.guest_hash === guest.hash ? orderAccessCode(guest.secret, order.id) : null }, 201);
   } catch (error) { if (error instanceof SyntaxError) return json({ error: "Data tidak valid." }, 400); return paymentError(error); }
 }

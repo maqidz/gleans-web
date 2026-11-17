@@ -18,7 +18,7 @@ export function BlogCover({
   className,
   size = "card",
 }: {
-  post: Pick<PostMeta, "title" | "category" | "cover">;
+  post: Pick<PostMeta, "title" | "category" | "cover" | "coverAlt">;
   className?: string;
   size?: "card" | "hero";
 }) {
@@ -27,7 +27,7 @@ export function BlogCover({
   return (
     <div className={cn("relative aspect-video overflow-hidden rounded-xl bg-surface", className)}>
       {src ? (
-        <Image src={src} alt="" fill className="object-cover" sizes="(min-width: 1024px) 372px, 100vw" />
+        <Image src={src} alt={post.coverAlt ?? ""} unoptimized={src.startsWith("https://")} fill className="object-cover" sizes="(min-width: 1024px) 372px, 100vw" />
       ) : (
         <div
           className={cn(

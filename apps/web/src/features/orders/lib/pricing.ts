@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { formatRupiah } from "@/lib/format";
 
 export const whatsappSchema = z
   .string()
@@ -17,10 +18,16 @@ const PROMO_RULES: PromoRule[] = [
 
 export type AppliedPromo = { code: string; label: string; discount: number };
 
+export function calculatePromo(code: string, value: number, percent: boolean, subtotal: number): AppliedPromo {
+  const raw = percent ? Math.round((subtotal * value) / 100) : value;
+  const discount = Math.min(raw, Math.max(0, subtotal - 1));
+  const label = percent ? `Diskon ${value}%` : `Potongan ${formatRupiah(discount)}`;
+  return { code, label, discount };
+}
+
 export function resolvePromo(input: string, subtotal: number): AppliedPromo | null {
   const code = input.trim().toUpperCase();
   const rule = PROMO_RULES.find((r) => r.code === code);
   if (!rule) return null;
-  const raw = rule.percent ? Math.round((subtotal * rule.percent) / 100) : (rule.amount ?? 0);
-  return { code: rule.code, label: rule.label, discount: Math.min(raw, subtotal) };
+  return calculatePromo(rule.code, rule.percent ?? rule.amount ?? 0, Boolean(rule.percent), subtotal);
 }

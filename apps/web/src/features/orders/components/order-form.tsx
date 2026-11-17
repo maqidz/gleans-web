@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { startCheckoutTransition } from "@/features/payments/checkout-transition";
+import { ShieldPriceChanged, startCheckoutTransition } from "@/features/payments/checkout-transition";
 import { useBillingTotals } from "@/features/payments/billing/client";
 import { finishPaymentUpload, preparePaymentUpload, uploadPaymentFile } from "@/features/payments/upload-file";
 import { useDropzone } from "react-dropzone";
@@ -17,10 +17,8 @@ import {
   ACCEPTED_FILES,
   LIMIT_LABEL,
   MAX_FILE_BYTES,
-  PRICE_PER_DOCUMENT,
   type AppliedPromo,
   extractWordCount,
-  resolvePromo,
   validateFile,
   validateWords,
   whatsappSchema,
@@ -36,12 +34,14 @@ const PAYMENT_METHODS = [
   { id: "quota", label: "Kuota Shield", icon: Layers },
 ] as const;
 
-export function OrderForm() {
+export function OrderForm({ price: initialPrice }: { price: number }) {
   const router = useRouter();
   const [whatsapp, setWhatsapp] = useState("");
   const [whatsappError, setWhatsappError] = useState<string | null>(null);
   const [promoInput, setPromoInput] = useState("");
   const [promo, setPromo] = useState<AppliedPromo | null>(null);
+  const [price, setPrice] = useState(initialPrice);
+  const [promoBusy, setPromoBusy] = useState(false);
   const [document, setDocument] = useState<Document | null>(null);
   const [reading, setReading] = useState(false);
   const [paying, setPaying] = useState(false);
@@ -49,7 +49,7 @@ export function OrderForm() {
   const { totals, error: billingError, authRequired } = useBillingTotals(paymentMethod !== "qris");
   const preparingUpload = useRef<UploadPreparation | null>(null);
 
-  const subtotal = document ? PRICE_PER_DOCUMENT : 0;
+  const subtotal = document ? price : 0;
   const discount = document ? (promo?.discount ?? 0) : 0;
   const total = subtotal - discount;
   const paymentAllowed = paymentMethod === "qris" || (totals && (
@@ -104,20 +104,28 @@ export function OrderForm() {
     onDropRejected: () => toast.error("File ditolak. Pastikan format PDF, DOC, DOCX, atau TXT di bawah 25MB."),
   });
 
-  function applyPromo() {
+  async function applyPromo() {
     const code = promoInput.trim();
     if (!code) {
       toast.error("Masukkan kode promo terlebih dahulu.");
       return;
     }
-    const applied = resolvePromo(code, PRICE_PER_DOCUMENT);
-    if (!applied) {
+    setPromoBusy(true);
+    try {
+      const response = await fetch("/api/promotions/quote", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      setPrice(data.price);
+      setPromo(data.promo);
+      toast.success(`Kode ${data.promo.code} dipakai. ${data.promo.label}.`);
+    } catch (error) {
       setPromo(null);
-      toast.error("Kode promo tidak ditemukan atau sudah kedaluwarsa.");
-      return;
+      toast.error(error instanceof Error ? error.message : "Kode promo belum dapat diperiksa.");
+    } finally {
+      setPromoBusy(false);
     }
-    setPromo(applied);
-    toast.success(`Kode ${applied.code} dipakai. ${applied.label}.`);
   }
 
   function handlePay() {
@@ -130,15 +138,16 @@ export function OrderForm() {
     const { file, words, requestId, preparation, preparedAt } = document;
     let ticketId: string | undefined;
     let usePreparation = Date.now() - preparedAt < 10 * 60_000;
-    startCheckoutTransition(requestId, { document_name: file.name, amount: total, method: paymentMethod }, async () => {
+    startCheckoutTransition(requestId, { document_name: file.name, amount: total, method: paymentMethod }, async expectedAmount => {
       if (usePreparation) {
         usePreparation = false;
         const upload = await preparation.catch(() => null);
         if (upload) ticketId = await finishPaymentUpload(file, upload);
       }
       ticketId ??= await uploadPaymentFile(file);
-      const response = await fetch("/api/payments/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, ticketId, words, whatsapp: parsed.data, method: paymentMethod, ...(promo ? { promo: promo.code } : {}) }) });
+      const response = await fetch("/api/payments/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, ticketId, words, whatsapp: parsed.data, method: paymentMethod, expectedAmount, ...(promo ? { promo: promo.code } : {}) }) });
       const body = await response.json();
+      if (response.status === 409 && body.code === "SHIELD_PRICE_CHANGED") throw new ShieldPriceChanged(body.error, body.amount);
       if (!response.ok || !body.order) throw new Error(body.error || "Tidak dapat membuka pembayaran.");
       // The upload already established the guest cookie for this browser.
       return { ...body.order, access_code: body.access_code };
@@ -197,6 +206,7 @@ export function OrderForm() {
             <Input
               id="promo"
               value={promoInput}
+              disabled={promoBusy || paying}
               onChange={(e) => {
                 setPromoInput(e.target.value);
                 setPromo(null);
@@ -208,9 +218,10 @@ export function OrderForm() {
               type="button"
               size="pill-sm"
               onClick={applyPromo}
+              disabled={promoBusy || paying}
               className="absolute top-1/2 right-1 w-[104px] -translate-y-1/2 text-xs font-normal sm:text-sm"
             >
-              Gunakan
+              {promoBusy ? "Memeriksa…" : "Gunakan"}
             </Button>
           </div>
         </Field>
@@ -336,7 +347,7 @@ export function OrderForm() {
               type="button"
               size="pill"
               onClick={handlePay}
-              disabled={!document || reading || paying || !paymentAllowed}
+              disabled={!document || reading || paying || promoBusy || !paymentAllowed}
               className="w-full font-normal disabled:opacity-100"
             >
               {paymentMethod === "balance" ? "Bayar dengan Saldo" : paymentMethod === "quota" ? "Gunakan 1 Kuota" : "Bayar Sekarang"}

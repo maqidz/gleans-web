@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@gleans/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@gleans/ui/dialog";
-import { billingRequest } from "@/features/payments/billing/client";
+import { BillingRequestError, billingRequest } from "@/features/payments/billing/client";
 import { BILLING_ID, MAX_TOPUP, MIN_TOPUP, type BillingSnapshot, type BillingTransaction } from "@/features/payments/billing/types";
 import { formatRupiah } from "@/lib/format";
 import { PLANS } from "@/lib/plans";
@@ -16,7 +16,7 @@ import { Choice, dateLabel, Empty, fieldClass, Heading, Panel } from "./shared";
 type Plan = (typeof PLANS)[number];
 type Intent =
   | { kind: "topup"; requestId: string; amount: number }
-  | { kind: "package"; requestId: string; planId: Plan["id"]; method: "qris" | "balance" };
+  | { kind: "package"; requestId: string; planId: Plan["id"]; method: "qris" | "balance"; expectedAmount: number };
 
 const methods = [{ value: "qris", label: "QRIS" }, { value: "balance", label: "Saldo Gleans" }];
 const methodLabels = { qris: "QRIS", balance: "Saldo Gleans", quota: "Kuota Shield" };
@@ -62,6 +62,12 @@ export function DashboardBilling() {
     return () => controller.abort();
   }, [refresh]);
 
+  useEffect(() => {
+    const loadOnFocus = () => void refresh();
+    window.addEventListener("focus", loadOnFocus);
+    return () => window.removeEventListener("focus", loadOnFocus);
+  }, [refresh]);
+
   const returned = returnedId && BILLING_ID.test(returnedId) ? snapshot?.transactions.find(item => item.id === returnedId) : undefined;
   const current = transaction ?? returned;
   const plan = intent?.kind === "package" ? PLANS.find(item => item.id === intent.planId) : undefined;
@@ -98,6 +104,9 @@ export function DashboardBilling() {
       setIntent(null);
       setTransaction(result.transaction);
     } catch (error) {
+      if (error instanceof BillingRequestError && error.updatedPrice != null && intent.kind === "package") {
+        setIntent({ ...intent, expectedAmount: error.updatedPrice });
+      }
       setActionError(error instanceof Error ? error.message : "Transaksi belum dapat diproses.");
     } finally {
       setBusy(false);
@@ -139,25 +148,27 @@ export function DashboardBilling() {
       <section className="mt-8">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">Pilih paket Shield</h2>
-          <div className="w-44"><Choice label="Metode pembelian paket" value={method} onChange={value => setMethod(value === "balance" ? "balance" : "qris")} options={methods} /></div>
+          <Choice label="Metode pembelian paket" value={method} onChange={value => setMethod(value === "balance" ? "balance" : "qris")} options={methods} />
         </div>
         <div className="grid gap-4 md:grid-cols-3">
           {PLANS.map(item => {
-            const insufficient = !!snapshot && method === "balance" && snapshot.balance < item.price;
+            const price = snapshot?.packagePrices[item.id];
+            const insufficient = snapshot && price != null && method === "balance" && snapshot.balance < price;
             return (
               <Panel key={item.id} className="flex flex-col border bg-white">
                 <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">{item.name}</h3><span className="text-xs text-primary">{item.checks}x cek</span></div>
-                <p className="mt-6 text-2xl font-semibold">{formatRupiah(item.price)}</p>
+                <p className="mt-6 text-2xl font-semibold">{price == null ? "—" : formatRupiah(price)}</p>
                 <p className="mt-2 flex-1 text-xs leading-relaxed text-muted-foreground">{item.blurb}</p>
                 {insufficient ? (
                   <>
                     <p className="mt-4 text-xs text-muted-foreground">Saldo belum cukup.</p>
-                    <Button size="pill-sm" variant="outline" className="mt-3" onClick={() => openTopup(Math.max(MIN_TOPUP, item.price - snapshot.balance))}>Isi saldo</Button>
+                    <Button size="pill-sm" variant="outline" className="mt-3" onClick={() => openTopup(Math.max(MIN_TOPUP, price - snapshot.balance))}>Isi saldo</Button>
                   </>
                 ) : (
-                  <Button size="pill-sm" className="mt-6" disabled={!snapshot} onClick={() => {
+                  <Button size="pill-sm" className="mt-6" disabled={price == null} onClick={() => {
+                    if (price == null) return;
                     setActionError("");
-                    setIntent({ kind: "package", requestId: crypto.randomUUID(), planId: item.id, method });
+                    setIntent({ kind: "package", requestId: crypto.randomUUID(), planId: item.id, method, expectedAmount: price });
                   }}>Pilih {item.name}</Button>
                 )}
               </Panel>
@@ -168,7 +179,7 @@ export function DashboardBilling() {
       <section aria-label="Riwayat transaksi" className="mt-8">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold">Riwayat transaksi</h2>
-          <div className="w-40"><Choice label="Filter transaksi" value={filter} onChange={setFilter} options={[{ value: "all", label: "Semua" }, { value: "topup", label: "Top-up" }, { value: "package", label: "Paket" }, { value: "shield", label: "Pesanan Shield" }]} /></div>
+          <Choice label="Filter transaksi" value={filter} onChange={setFilter} options={[{ value: "all", label: "Semua" }, { value: "topup", label: "Top-up" }, { value: "package", label: "Paket" }, { value: "shield", label: "Pesanan Shield" }]} />
         </div>
         {!snapshot && !loadError && <p role="status" className="text-sm text-muted-foreground">Memuat riwayat transaksi…</p>}
         {snapshot && (history.length ? (
@@ -216,7 +227,7 @@ export function DashboardBilling() {
             <DialogDescription>{current ? current.id : plan && intent?.kind === "package" && intent.method === "balance" ? "Total akan dipotong dari Saldo Gleans Sandbox." : "Pembayaran melalui QRIS Duitku Sandbox."}</DialogDescription>
           </DialogHeader>
           <div className="flex items-center justify-between gap-3 rounded-xl bg-surface p-3 text-sm font-semibold">
-            <span>Total</span><span>{formatRupiah(current?.amount ?? (intent?.kind === "topup" ? intent.amount : plan?.price ?? 0))}</span>
+            <span>Total</span><span>{formatRupiah(current?.amount ?? (intent?.kind === "topup" ? intent.amount : intent?.expectedAmount ?? 0))}</span>
           </div>
           {actionError && <p role="alert" className="text-sm text-destructive">{actionError}</p>}
           {current ? (

@@ -2,7 +2,8 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import type { DashboardUser } from "@/features/auth/types";
-import { PLANS } from "@/lib/plans";
+import { MAX_SHIELD_PRICE, PLANS } from "@/lib/plans";
+import { readShieldPricing } from "@/features/orders/lib/shield-pricing";
 import { paymentAdmin } from "../server/repository";
 import { callbackOrigin, createQrisInvoice, InvoiceRejected, transactionStatus } from "../server/duitku";
 import { json, paymentError } from "../server/http";
@@ -25,7 +26,7 @@ const publicTransaction = (transaction: StoredTransaction): BillingTransaction =
 
 export const billingPurchaseSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("topup"), requestId: z.string().uuid(), amount: z.number().int().min(MIN_TOPUP).max(MAX_TOPUP) }).strict(),
-  z.object({ kind: z.literal("package"), requestId: z.string().uuid(), planId: z.enum(["starter", "standart", "premium"]), method: z.enum(["qris", "balance"]) }).strict(),
+  z.object({ kind: z.literal("package"), requestId: z.string().uuid(), planId: z.enum(["starter", "standart", "premium"]), method: z.enum(["qris", "balance"]), expectedAmount: z.number().int().min(1).max(MAX_SHIELD_PRICE).optional() }).strict(),
 ]);
 
 export async function billingTotals(ownerId: string) {
@@ -36,13 +37,14 @@ export async function billingTotals(ownerId: string) {
 }
 
 export async function billingSnapshot(ownerId: string) {
-  const [totals, { data, error }] = await Promise.all([
+  const [totals, { data, error }, pricing] = await Promise.all([
     billingTotals(ownerId),
     paymentAdmin().database.from("billing_transactions").select(transactionColumns)
       .eq("owner_id", ownerId).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(50),
+    readShieldPricing(),
   ]);
   if (error) throw new Error("DATABASE_UNAVAILABLE");
-  return { ...totals, transactions: data as BillingTransaction[] };
+  return { ...totals, transactions: data as BillingTransaction[], packagePrices: pricing.packages };
 }
 
 export async function findBillingTransaction(id: string, ownerId?: string) {
@@ -55,7 +57,7 @@ export async function findBillingTransaction(id: string, ownerId?: string) {
 export async function buyBilling(account: DashboardUser, input: z.infer<typeof billingPurchaseSchema>) {
   const plan = input.kind === "package" ? PLANS.find(item => item.id === input.planId) : undefined;
   const method = input.kind === "topup" ? "qris" : input.method;
-  const amount = input.kind === "topup" ? input.amount : plan!.price;
+  const amount = input.kind === "topup" ? input.amount : input.expectedAmount ?? plan!.price;
   if (method === "qris") callbackOrigin();
 
   const admin = paymentAdmin();
@@ -77,7 +79,7 @@ export async function buyBilling(account: DashboardUser, input: z.infer<typeof b
   try {
     invoice = await createQrisInvoice({
       id: transaction.id,
-      amount,
+      amount: transaction.amount,
       productName: plan ? `Paket Gleans Shield ${plan.name}` : "Top-up Saldo Gleans",
       returnPath: `/dashboard/paket-saldo?billing=${encodeURIComponent(transaction.id)}`,
     }, account);
@@ -136,7 +138,14 @@ export async function checkBilling(transaction: StoredTransaction, ownerId: stri
 export function billingError(error: unknown) {
   if (error instanceof SyntaxError) return json({ error: "Data transaksi tidak valid." }, 400);
   if (error instanceof InvoiceRejected) return json({ error: error.publicMessage }, 400);
-  const message = (error as { message?: string } | null)?.message ?? "";
+  const details = error as { message?: string; details?: string } | null;
+  const message = details?.message ?? "";
+  if (message === "BILLING_PRICE_CHANGED") {
+    const amount = Number(details?.details);
+    if (Number.isInteger(amount) && amount >= 1 && amount <= MAX_SHIELD_PRICE) {
+      return json({ error: "Harga paket berubah. Periksa total baru sebelum membayar.", code: "BILLING_PRICE_CHANGED", amount }, 409);
+    }
+  }
   if (message.includes("INSUFFICIENT_BALANCE")) return json({ error: "Saldo Gleans belum cukup." }, 409);
   if (message.includes("BILLING_REQUEST_CONFLICT")) return json({ error: "Transaksi ini sudah memakai pilihan lain. Buat transaksi baru." }, 409);
   if (message.includes("BILLING_LIMIT")) return json({ error: "Terlalu banyak transaksi. Coba kembali nanti." }, 429);

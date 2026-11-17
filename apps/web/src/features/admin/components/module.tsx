@@ -12,7 +12,8 @@ import { cn } from "@/lib/utils";
 import { AdminFilterDropdown } from "./filter-dropdown";
 import { AdminContentTable } from "./content-table";
 import { AdminCustomers } from "./customers";
-import { AdminUnavailable } from "./unavailable";
+import { AdminShieldPricing } from "./shield-pricing";
+import { AdminEditorialList } from "./editorial-list";
 import { card } from "./overview";
 import { formatRupiah } from "@/lib/format";
 import { ADMIN_BLOG_CATEGORIES, type Module, type Collection, type RecordData, type AdminState } from "@/features/admin/lib/model";
@@ -29,7 +30,13 @@ function today(){return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Jakarta"
 function blank(collection:Collection):RecordData{const id=`DEMO-${crypto.randomUUID().slice(0,8)}`;switch(collection){case"customers":return{id,name:"",email:"",whatsapp:"",balance:0,quota:0};case"orders":return{id:`GLS-${crypto.randomUUID().replaceAll("-", "").slice(0,12).toUpperCase()}`,customerId:"USR-001",document:"",amount:10000,payment:"Menunggu",processing:"Belum diproses",delivery:"Belum dikirim",note:"",date:today()};case"plans":return{id,name:"",price:45000,quota:5,active:true};case"blogs":return{id,title:"",slug:"",category:"Edukasi",summary:"",content:"",status:"Draft",author:"Tim Gleans",coverId:"",coverAlt:"",featured:false};case"promos":return{id,name:"",title:"",type:"Banner",code:"",discount:0,start:today(),end:today(),active:false};}}
 function Heading({title,description}:{title:string;description:string}){return <div className="mb-7"><h1 className="text-2xl font-semibold sm:text-3xl">{title}</h1><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{description}</p></div>;}
 function message(error:unknown){return error instanceof z.ZodError?error.issues.map(x=>`${x.path.join(".")}: ${x.message}`).join(" · "):error instanceof Error?error.message:"Periksa data yang dimasukkan.";}
-export function AdminModule({module}:{module:Module}) { return module==="pesanan" ? <ShieldOrders/> : module==="pelanggan" ? <AdminCustomers/> : module==="pengaturan" ? <AdminSettings/> : <AdminUnavailable title={definitions[module].title}/>; }
+export function AdminModule({module}:{module:Module}) {
+  if (module === "paket-transaksi") return <AdminShieldPricing />;
+  if (module === "blog" || module === "promosi") return <AdminEditorialList key={module} module={module} />;
+  if (module === "pesanan") return <ShieldOrders />;
+  if (module === "pelanggan") return <AdminCustomers />;
+  return <AdminSettings />;
+}
 export function LegacyRecords({module}:{module:Exclude<Module,"pengaturan">}) {
  const openedDetail=useRef<string|null>(null);
  const {state,save}=useAdmin();const params=useSearchParams();const router=useRouter();const def=definitions[module];const [query,setQuery]=useState("");const [filter,setFilter]=useState(params.get("status")==="gagal"?"Gagal":params.get("status")==="proses"?"Diproses":"Semua");const [edit,setEdit]=useState<RecordData|null>(null);const [preview,setPreview]=useState<RecordData|null>(null);const [reason,setReason]=useState("");const [error,setError]=useState("");const [txFilter,setTxFilter]=useState("Semua");

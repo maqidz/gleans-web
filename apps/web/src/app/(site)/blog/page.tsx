@@ -5,7 +5,8 @@ import { BlogCover } from "@/features/blog/components/blog-cover";
 import { Breadcrumb } from "@/components/layout/breadcrumb";
 import { CtaBanner } from "@/components/layout/cta-banner";
 import { PageIntro } from "@/components/layout/section-heading";
-import { BLOG_CATEGORIES, categorySlug, getAllPosts } from "@/features/blog/lib/content";
+import { BLOG_CATEGORIES, categorySlug } from "@/features/blog/lib/content";
+import { listPublishedArticles } from "@/features/admin/lib/site-editor";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -15,9 +16,9 @@ export const metadata: Metadata = {
 
 export default async function BlogPage({ searchParams }: { searchParams: Promise<{ kategori?: string }> }) {
   const { kategori } = await searchParams;
-  const posts = getAllPosts();
+  const posts = await listPublishedArticles();
   const active = BLOG_CATEGORIES.find((c) => categorySlug(c) === kategori);
-  const featured = posts[0];
+  const featured = posts.find(post => post.featured) ?? posts[0];
   const list = active ? posts.filter((p) => p.category === active) : posts;
 
   return (

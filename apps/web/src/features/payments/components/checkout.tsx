@@ -9,7 +9,7 @@ import { PageIntro } from "@/components/layout/section-heading";
 import { PRODUCTS } from "@/config/site";
 import { formatRupiah } from "@/lib/format";
 import type { PaymentOrder } from "../types";
-import { clearCheckoutTransition, getCheckoutTransition, requestPaymentAction, startCheckoutTransition, type CheckoutPreview } from "../checkout-transition";
+import { clearCheckoutTransition, getCheckoutTransition, requestPaymentAction, ShieldPriceChanged, startCheckoutTransition, type CheckoutPreview } from "../checkout-transition";
 const labels = { draft: "Belum dibayar", creating: "Transaksi belum dikonfirmasi", pending: "Menunggu Pembayaran", paid: "Pembayaran Berhasil", failed: "Pembayaran Gagal", expired: "Pembayaran Kedaluwarsa" };
 export function PaymentCheckout() {
   const params = useSearchParams();
@@ -19,6 +19,7 @@ export function PaymentCheckout() {
   const [preview, setPreview] = useState<CheckoutPreview | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [error, setError] = useState("");
+  const [requotedAmount, setRequotedAmount] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [cooldown, setCooldown] = useState(0);
@@ -59,6 +60,7 @@ export function PaymentCheckout() {
     setPreview(transition.preview);
     setBusy(true);
     setError("");
+    setRequotedAmount(null);
     if (!id) {
       void transition.reservation.then(reserved => {
         if (!active) return;
@@ -66,6 +68,7 @@ export function PaymentCheckout() {
         window.history.replaceState(null, "", `/pembayaran?order=${encodeURIComponent(reserved.id)}`);
       }, error => {
         if (!active) return;
+        if (error instanceof ShieldPriceChanged) setRequotedAmount(error.amount);
         setError(error instanceof Error ? error.message : "Tidak dapat membuka pembayaran.");
         setBusy(false);
       });
@@ -90,7 +93,7 @@ export function PaymentCheckout() {
   function retryReservation() {
     const transition = getCheckoutTransition(null, requestId);
     if (!transition || busy) return;
-    startCheckoutTransition(transition.requestId, transition.preview, transition.reserve);
+    startCheckoutTransition(transition.requestId, { ...transition.preview, amount: requotedAmount ?? transition.preview.amount }, transition.reserve);
     setAttempt(value => value + 1);
   }
   async function act(action: "pay" | "check") {
@@ -123,7 +126,7 @@ export function PaymentCheckout() {
     try { await navigator.clipboard.writeText(`${window.location.origin}/pembayaran?order=${encodeURIComponent(order.id)}#access=${encodeURIComponent(order.access_code)}`); setNotice("Tautan akses disalin. Simpan secara pribadi untuk mengunduh hasil di perangkat lain."); }
     catch { setNotice(`Simpan kode akses ini secara pribadi: ${order.access_code}`); }
   }
-  const summary = order ?? preview;
+  const summary = order ?? (preview && { ...preview, amount: requotedAmount ?? preview.amount });
   const method = order?.payment_method ?? preview?.method;
   const wallet = method === "balance" || method === "quota";
   const qrCode = order?.status === "pending" ? order.qr_string : null;
@@ -225,7 +228,9 @@ export function PaymentCheckout() {
           {cooldown ? `Periksa lagi dalam ${cooldown} detik` : "Periksa Status Pembayaran"}
         </Button>
       )}
-      {!id && requestId && preview && error && <Button variant="outline" className="w-full" onClick={retryReservation}>Coba Lagi</Button>}
+      {!id && requestId && preview && error && <Button variant={requotedAmount == null ? "outline" : "default"} className="w-full" onClick={retryReservation}>
+        {requotedAmount == null ? "Coba Lagi" : `Setujui total ${formatRupiah(requotedAmount)}`}
+      </Button>}
       {!order && id && loaded && (
         <Button variant="outline" className="w-full" onClick={() => {
           setError("");

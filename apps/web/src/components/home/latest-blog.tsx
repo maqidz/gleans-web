@@ -2,10 +2,11 @@ import Link from "next/link";
 import { BlogCard } from "@/features/blog/components/blog-card";
 import { SectionHeading } from "@/components/layout/section-heading";
 import { Button } from "@gleans/ui/button";
-import { getAllPosts } from "@/features/blog/lib/content";
+import { listPublishedArticles } from "@/features/admin/lib/site-editor";
 
-export function LatestBlog() {
-  const posts = getAllPosts().slice(0, 3);
+export async function LatestBlog() {
+  const articles = await listPublishedArticles().catch(() => []);
+  const posts = [...articles].sort((a, b) => Number(!!b.featured) - Number(!!a.featured)).slice(0, 3);
   if (posts.length === 0) return null;
 
   return (

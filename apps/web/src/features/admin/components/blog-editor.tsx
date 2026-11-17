@@ -1,49 +1,286 @@
 "use client";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Bold, Italic, Strikethrough, Quote, List, ListOrdered, ChevronDown, ImageIcon, Send } from "lucide-react";
-import { z } from "zod";
+import { ArrowLeft, Bold, Italic, Strikethrough, Quote, List, ListOrdered, ChevronDown, ImageIcon, Send, Save } from "lucide-react";
 import { Button } from "@gleans/ui/button";
-import { ADMIN_BLOG_CATEGORIES, type AdminState } from "@/features/admin/lib/model";
-import { mediaStore, type AdminMedia } from "@/features/admin/lib/media";
-import { useAdmin } from "./provider";
-type Blog=AdminState["blogs"][number];
-const field="h-11 w-full min-w-0 rounded-full border bg-white px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary";
-const slugify=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
-function Label({name,children}:{name:string;children:ReactNode}){return <label className="block space-y-2 text-sm font-medium"><span>{name}</span>{children}</label>;}
-function Inline({text}:{text:string}) {return <>{text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~)/g).map((part,i)=>part.startsWith("**")?<strong key={i}>{part.slice(2,-2)}</strong>:part.startsWith("*")?<em key={i}>{part.slice(1,-1)}</em>:part.startsWith("~~")?<s key={i}>{part.slice(2,-2)}</s>:part)}</>;}
-function Markdown({content}:{content:string}) {return <div className="space-y-3 text-sm leading-7">{content.split("\n").map((line,i)=>{
- if(/^### /.test(line))return <h3 key={i} className="text-lg font-semibold"><Inline text={line.slice(4)}/></h3>;
- if(/^## /.test(line))return <h2 key={i} className="text-xl font-semibold"><Inline text={line.slice(3)}/></h2>;
- if(/^# /.test(line))return <h1 key={i} className="text-2xl font-semibold"><Inline text={line.slice(2)}/></h1>;
- if(/^> /.test(line))return <blockquote key={i} className="border-l-2 border-primary pl-4 text-muted-foreground"><Inline text={line.slice(2)}/></blockquote>;
- if(/^[-*] /.test(line))return <p key={i} className="pl-3">• <Inline text={line.slice(2)}/></p>;
- if(/^\d+\. /.test(line))return <p key={i} className="pl-3"><Inline text={line}/></p>;
- const image=line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);if(image&&/^(https?:\/\/|\/images\/)/.test(image[2]))return <img key={i} src={image[2]} alt={image[1]} className="max-w-full rounded-2xl"/>;
- return line?<p key={i} className="break-words"><Inline text={line}/></p>:<div key={i} className="h-2"/>;
- })}</div>;}
-export function AdminBlogEditor({id}:{id:string}) {
- const {state,save}=useAdmin();const router=useRouter();const existing=state.blogs.find(b=>b.id===id);
- const [draft,setDraft]=useState<Blog>(()=>existing?{...existing}:{id:`BLOG-${crypto.randomUUID().slice(0,8)}`,title:"",slug:"",summary:"",content:"",category:"Edukasi",author:"Tim Gleans",coverId:"",coverAlt:"",status:"Draft",featured:false});
- const [mode,setMode]=useState("write"),[error,setError]=useState(""),[notice,setNotice]=useState("");const [media,setMedia]=useState<(AdminMedia&{url:string})[]>([]);const textarea=useRef<HTMLTextAreaElement>(null);
- const [publishTime,setPublishTime]=useState(()=>draft.publishAt?new Date(Date.parse(draft.publishAt)+7*3600000).toISOString().slice(0,16):"");
- useEffect(()=>{let live=true;const urls:string[]=[];mediaStore("list").then(items=>{const next=items.map(item=>{const url=item.blob?URL.createObjectURL(item.blob):item.src||"";if(item.blob)urls.push(url);return {...item,url};});if(live)setMedia(next);else urls.forEach(url=>URL.revokeObjectURL(url));}).catch(()=>{if(live)setError("Pustaka media tidak dapat dimuat.");});return()=>{live=false;urls.forEach(url=>URL.revokeObjectURL(url));};},[]);
- if(id!=="baru"&&!existing)return <div className="py-12"><h1 className="text-2xl font-semibold">Artikel tidak ditemukan</h1><Link href="/admin/blog" className="mt-4 inline-block text-primary">Kembali ke Blog</Link></div>;
- function update<K extends keyof Blog>(key:K,value:Blog[K]){setDraft(current=>({...current,[key]:value}));setNotice("");}
- function format(before:string,after="",placeholder="Teks",prefix=false){const node=textarea.current;if(!node)return;const start=node.selectionStart,end=node.selectionEnd;const selected=draft.content.slice(start,end)||placeholder;const replacement=prefix?selected.split("\n").map((line,i)=>`${before==="1. "?`${i+1}. `:before}${line}`).join("\n"):before+selected+after;update("content",draft.content.slice(0,start)+replacement+draft.content.slice(end));requestAnimationFrame(()=>{node.focus();node.setSelectionRange(start+before.length,start+replacement.length-after.length);});}
- function persist(status:Blog["status"]){setError("");try{const publishAt=status==="Terjadwal"?(publishTime?new Date(`${publishTime}:00+07:00`).toISOString():undefined):undefined;save("blogs",{...draft,status,publishAt});setDraft(current=>({...current,status,publishAt}));setNotice(status==="Terjadwal"?"Jadwal tersimpan pada demo. Publikasi otomatis memerlukan integrasi server.":status==="Terbit"?"Artikel diterbitkan pada demo.":status==="Arsip"?"Artikel diarsipkan pada demo.":"Draft disimpan.");if(id==="baru")router.replace(`/admin/blog/${draft.id}`);}catch(e){setError(e instanceof z.ZodError?e.issues.map(issue=>issue.message).join(" · "):e instanceof Error?e.message:"Artikel belum dapat disimpan.");}}
- const cover=media.find(item=>item.id===draft.coverId);
- return <div className="min-w-0"><Link href="/admin/blog" className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary"><ArrowLeft className="size-4"/>Semua artikel</Link>
- <div className="mb-7 flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><h1 className="text-2xl font-semibold sm:text-3xl">{id==="baru"?"Tambah artikel":"Edit artikel"}</h1><span className="rounded-full bg-surface px-3 py-1 text-xs text-muted-foreground">{draft.status}</span></div><div className="flex flex-wrap gap-2"><Button variant="outline" className="h-11 rounded-full" onClick={()=>persist("Draft")}>Simpan draft</Button><Button className="h-auto gap-2 rounded-full p-3" onClick={()=>persist("Terbit")}><Send aria-hidden="true" className="size-4"/>Publish</Button></div></div>
- {error&&<p role="alert" className="mb-5 rounded-xl bg-red-50 p-4 text-sm text-destructive">{error}</p>}{notice&&<p role="status" className="mb-5 rounded-xl bg-accent p-4 text-sm text-primary">{notice}</p>}
- <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_300px]"><div className="min-w-0 space-y-5">
- <Label name="Judul"><input className={field} value={draft.title} placeholder="Judul artikel" onChange={e=>{const title=e.target.value;setDraft(current=>({...current,title,slug:!current.slug||current.slug===slugify(current.title)?slugify(title):current.slug}));setNotice("");}}/></Label>
- <Label name="Deskripsi"><textarea className="min-h-24 w-full rounded-2xl border bg-white p-4 text-sm font-normal outline-none focus-visible:ring-2 focus-visible:ring-primary" maxLength={500} value={draft.summary} onChange={e=>update("summary",e.target.value)} placeholder="Ringkasan singkat artikel"/></Label>
- <div className="grid gap-4 sm:grid-cols-2"><Label name="Kategori"><div className="relative"><select className={field+" appearance-none pr-10"} value={draft.category} onChange={e=>update("category",e.target.value as Blog["category"])}>{ADMIN_BLOG_CATEGORIES.map(c=><option key={c}>{c}</option>)}</select><ChevronDown className="pointer-events-none absolute right-4 top-3.5 size-4 text-muted-foreground"/></div></Label><Label name="Penulis"><input className={field} value={draft.author} onChange={e=>update("author",e.target.value)}/></Label></div>
- <Label name="Slug"><div className="flex items-center gap-2"><span className="font-normal text-muted-foreground">/blog/</span><input className={field} value={draft.slug} onChange={e=>update("slug",e.target.value)}/></div></Label>
- <div><div className="mb-3 inline-flex rounded-full bg-surface p-1" role="tablist" aria-label="Mode editor">{[["write","Tulis (Markdown)"],["preview","Preview"]].map(([value,label])=><button key={value} role="tab" aria-selected={mode===value} className={`rounded-full px-4 py-2 text-sm ${mode===value?"bg-white font-medium shadow-sm":"text-muted-foreground"}`} onClick={()=>setMode(value)}>{label}</button>)}</div>
- {mode==="write"?<><div className="mb-3 flex flex-wrap items-center gap-1 rounded-2xl bg-surface p-2"><select aria-label="Gaya teks" className="h-9 rounded-full bg-transparent px-3 text-sm" value="" onChange={e=>{format(e.target.value,"","Judul",true);}}><option value="" disabled>Gaya teks</option><option value="# ">Judul 1</option><option value="## ">Judul 2</option><option value="### ">Judul 3</option></select>{[{label:"Tebal",Icon:Bold,before:"**",after:"**"},{label:"Miring",Icon:Italic,before:"*",after:"*"},{label:"Coret",Icon:Strikethrough,before:"~~",after:"~~"},{label:"Kutipan",Icon:Quote,before:"> ",prefix:true},{label:"Daftar poin",Icon:List,before:"- ",prefix:true},{label:"Daftar nomor",Icon:ListOrdered,before:"1. ",prefix:true}].map(({label,Icon,before,after,prefix})=><Button key={label} variant="ghost" size="icon" aria-label={label} onClick={()=>format(before,after,"Teks",prefix)}><Icon className="size-4"/></Button>)}</div><textarea ref={textarea} aria-label="Isi artikel" className="min-h-[420px] w-full rounded-2xl border bg-white p-4 font-mono text-sm leading-7 outline-none focus-visible:ring-2 focus-visible:ring-primary" value={draft.content} onChange={e=>update("content",e.target.value)} placeholder="Tulis isi artikel di sini."/></>:<article className="min-h-[420px] rounded-2xl border p-5">{cover&&<img src={cover.url} alt={draft.coverAlt} className="mb-5 aspect-video w-full rounded-2xl object-cover"/>}<p className="mb-2 text-xs text-muted-foreground">{draft.category} · {draft.author}</p><h2 className="mb-3 text-2xl font-semibold">{draft.title||"Judul artikel"}</h2><p className="mb-6 text-sm text-muted-foreground">{draft.summary}</p>{draft.content?<Markdown content={draft.content}/>:<p className="text-sm text-muted-foreground">Isi artikel belum ditulis.</p>}</article>}</div></div>
- <aside className="min-w-0 space-y-6 self-start rounded-[24px] bg-surface p-5"><Label name="Waktu publikasi (WIB)"><input type="datetime-local" className={field} value={publishTime} onChange={e=>setPublishTime(e.target.value)}/></Label><p className="-mt-4 text-xs leading-relaxed text-muted-foreground">Klik Publish untuk menerbitkan artikel sekarang.</p><div className="space-y-3"><p className="text-sm font-medium">Gambar cover</p>{cover?<img src={cover.url} alt={draft.coverAlt} className="aspect-video w-full rounded-2xl border object-cover"/>:<div className="flex aspect-video items-center justify-center rounded-2xl border bg-white text-muted-foreground"><ImageIcon className="size-8"/></div>}<Label name="Pilih dari pustaka media"><select className={field} value={draft.coverId} onChange={e=>update("coverId",e.target.value)}><option value="">Tanpa cover</option>{media.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></Label><Label name="Teks alternatif cover"><input className={field} value={draft.coverAlt} onChange={e=>update("coverAlt",e.target.value)} placeholder="Deskripsi gambar"/></Label><Link href="/admin/pengaturan" className="inline-block text-xs text-primary">Kelola pustaka media</Link></div><div className="flex items-center justify-between gap-3"><span className="text-sm font-medium">Unggulan di homepage</span><button role="switch" aria-label="Unggulan di homepage" aria-checked={draft.featured} onClick={()=>update("featured",!draft.featured)} className={`inline-flex h-6 w-11 shrink-0 rounded-full p-0.5 ${draft.featured?"bg-primary":"bg-muted"}`}><span className={`size-5 rounded-full bg-white shadow-sm transition-transform ${draft.featured?"translate-x-5":""}`}/></button></div></aside>
- </div></div>;
+import { Input } from "@gleans/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@gleans/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@gleans/ui/tabs";
+import { ADMIN_BLOG_CATEGORIES, BLOG_AUTHOR, type AdminState } from "@/features/admin/lib/model";
+import type { AdminMedia } from "@/features/admin/lib/media";
+import { cn } from "@/lib/utils";
+import { editorRequest, saveEditorRecord } from "../lib/editor-client";
+
+type Blog = AdminState["blogs"][number];
+
+const field = "h-11 w-full min-w-0 rounded-xl border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30";
+const panel = "min-w-0 rounded-[24px] border bg-card";
+const noCover = "none";
+const categoryOptions = ADMIN_BLOG_CATEGORIES.map(category => ({ value: category, label: category }));
+const toolbar = [
+  { label: "Tebal", icon: Bold, before: "**", after: "**" },
+  { label: "Miring", icon: Italic, before: "*", after: "*" },
+  { label: "Coret", icon: Strikethrough, before: "~~", after: "~~" },
+  { label: "Kutipan", icon: Quote, before: "> ", prefix: true },
+  { label: "Daftar poin", icon: List, before: "- ", prefix: true },
+  { label: "Daftar nomor", icon: ListOrdered, before: "1. ", prefix: true },
+];
+
+function slugify(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function Label({ name, children }: { name: string; children: ReactNode }) {
+  return <label className="block space-y-1.5 text-sm font-medium">
+    <span>{name}</span>{children}
+  </label>;
+}
+
+function ArticleSelect({ label, value, options, disabled, onChange }: {
+  label: string;
+  value: string;
+  options: readonly { value: string; label: string }[];
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  const id = useId();
+  return <div className="space-y-1.5 text-sm font-medium">
+    <label htmlFor={id} className="block">{label}</label>
+    <Select value={value} disabled={disabled} onValueChange={onChange}>
+      <SelectTrigger id={id} className="w-full gap-2 rounded-full bg-background px-4 py-0 font-normal data-[size=default]:h-11 data-[state=open]:[&>svg]:rotate-180 [&>svg]:transition-transform">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent position="popper" align="start" className="w-(--radix-select-trigger-width) min-w-0 rounded-xl border p-1">
+        {options.map(option => <SelectItem key={option.value} value={option.value}
+          className="min-h-10 cursor-pointer rounded-lg pl-3 data-[state=checked]:bg-accent data-[state=checked]:text-primary">
+          <span className="min-w-0 truncate">{option.label}</span>
+        </SelectItem>)}
+      </SelectContent>
+    </Select>
+  </div>;
+}
+
+function EditorSection({ title, children, open }: { title: string; children: ReactNode; open?: boolean }) {
+  return <details open={open} className={cn(panel, "group")}>
+    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-[24px] px-4 py-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">
+      {title}<ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground group-open:rotate-180" />
+    </summary>
+    <div className="space-y-4 px-4 pb-4">{children}</div>
+  </details>;
+}
+
+function Inline({ text }: { text: string }) {
+  return <>{text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~)/g).map((part, index) => {
+    if (part.startsWith("**")) return <strong key={index}>{part.slice(2, -2)}</strong>;
+    if (part.startsWith("*")) return <em key={index}>{part.slice(1, -1)}</em>;
+    if (part.startsWith("~~")) return <s key={index}>{part.slice(2, -2)}</s>;
+    return part;
+  })}</>;
+}
+
+function Markdown({ content }: { content: string }) {
+  return <div className="space-y-3 text-sm leading-7">{content.split("\n").map((line, index) => {
+    if (/^### /.test(line)) return <h4 key={index} className="text-lg font-semibold"><Inline text={line.slice(4)} /></h4>;
+    if (/^## /.test(line)) return <h3 key={index} className="text-xl font-semibold"><Inline text={line.slice(3)} /></h3>;
+    if (/^# /.test(line)) return <h3 key={index} className="text-2xl font-semibold"><Inline text={line.slice(2)} /></h3>;
+    if (/^> /.test(line)) return <blockquote key={index} className="border-l-2 border-primary pl-4 text-muted-foreground"><Inline text={line.slice(2)} /></blockquote>;
+    if (/^[-*] /.test(line)) return <p key={index} className="pl-3">• <Inline text={line.slice(2)} /></p>;
+    if (/^\d+\. /.test(line)) return <p key={index} className="pl-3"><Inline text={line} /></p>;
+    const image = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (image && /^(https?:\/\/|\/images\/)/.test(image[2])) {
+      return <Image key={index} src={image[2]} alt={image[1]} width={800} height={450} unoptimized className="h-auto max-w-full rounded-xl" />;
+    }
+    return line ? <p key={index} className="break-words"><Inline text={line} /></p> : <div key={index} className="h-2" />;
+  })}</div>;
+}
+
+export function AdminBlogEditor({ id, existing }: { id: string; existing?: Blog }) {
+  const router = useRouter();
+  const isNew = id === "baru";
+  const [draft, setDraft] = useState<Blog>(() => existing ? { ...existing } : {
+    id: "BLOG-" + crypto.randomUUID().slice(0, 8), title: "", slug: "", summary: "", content: "",
+    category: "Edukasi", author: BLOG_AUTHOR, coverId: "", coverAlt: "", status: "Draft", featured: false,
+  });
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [mediaError, setMediaError] = useState("");
+  const [media, setMedia] = useState<AdminMedia[]>([]);
+  const [busy, setBusy] = useState(false);
+  const textarea = useRef<HTMLTextAreaElement>(null);
+  const [publishTime, setPublishTime] = useState(() => draft.status === "Terjadwal" && draft.publishAt
+    ? new Date(Date.parse(draft.publishAt) + 7 * 3600_000).toISOString().slice(0, 16)
+    : "",
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void editorRequest<{ media: AdminMedia[] }>("/api/admin/site-editor?kind=media", { signal: controller.signal })
+      .then(data => { if (!controller.signal.aborted) setMedia(data.media); })
+      .catch(() => { if (!controller.signal.aborted) setMediaError("Pustaka media belum dapat dimuat."); });
+    return () => controller.abort();
+  }, []);
+
+  if (!isNew && !existing) return <div className="py-12">
+    <h1 className="text-2xl font-semibold">Artikel tidak ditemukan</h1>
+    <Link href="/admin/blog" className="mt-4 inline-block text-primary">Kembali ke Blog</Link>
+  </div>;
+
+  function update<K extends keyof Blog>(key: K, value: Blog[K]) {
+    setDraft(current => ({ ...current, [key]: value }));
+    setNotice("");
+  }
+
+  function format(before: string, after = "", placeholder = "Teks", prefix = false) {
+    const node = textarea.current;
+    if (!node) return;
+    const start = node.selectionStart;
+    const end = node.selectionEnd;
+    const selected = draft.content.slice(start, end) || placeholder;
+    const replacement = prefix
+      ? selected.split("\n").map((line, index) => (before === "1. " ? index + 1 + ". " : before) + line).join("\n")
+      : before + selected + after;
+    update("content", draft.content.slice(0, start) + replacement + draft.content.slice(end));
+    requestAnimationFrame(() => {
+      node.focus();
+      node.setSelectionRange(start + before.length, start + replacement.length - after.length);
+    });
+  }
+
+  async function persist(status: Blog["status"]) {
+    if (busy) return;
+    setError("");
+    setNotice("");
+    setBusy(true);
+    try {
+      const publishAt = status === "Terjadwal" && publishTime ? new Date(publishTime + ":00+07:00").toISOString() : undefined;
+      const { record } = await saveEditorRecord("blog", { ...draft, status, publishAt });
+      setDraft(record);
+      if (status !== "Terjadwal") setPublishTime("");
+      setNotice(status === "Terjadwal" ? "Jadwal publikasi disimpan." : status === "Terbit" ? "Artikel tersimpan dan terbit." : status === "Arsip" ? "Artikel diarsipkan." : "Draft disimpan.");
+      if (isNew) router.replace("/admin/blog/" + record.id);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Artikel belum dapat disimpan.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const cover = draft.coverId;
+  const coverOptions = [
+    { value: noCover, label: "Tanpa cover" },
+    ...(cover && !media.some(item => item.src === cover) ? [{ value: cover, label: "Gambar saat ini" }] : []),
+    ...media.flatMap(item => item.src ? [{ value: item.src, label: item.name }] : []),
+  ];
+  const published = draft.status === "Terbit";
+
+  return <div className="min-w-0">
+    <Link href="/admin/blog" className="mb-5 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
+      <ArrowLeft aria-hidden="true" className="size-4" />Semua artikel
+    </Link>
+    <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{isNew ? "Tambah artikel" : "Edit artikel"}</h1>
+        <span className={cn("rounded-full px-3 py-1 text-xs font-medium", published ? "bg-accent text-accent-foreground" : "bg-surface text-muted-foreground")}>{draft.status}</span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {draft.status === "Draft" && <Button variant="outline" size="pill-sm" disabled={busy} onClick={() => void persist("Draft")}>Simpan draft</Button>}
+        <Button size="pill-sm" disabled={busy} onClick={() => void persist("Terbit")}>
+          {published ? <Save aria-hidden="true" /> : <Send aria-hidden="true" />}
+          {published ? "Simpan perubahan" : "Terbitkan"}
+        </Button>
+      </div>
+    </header>
+    {error && <p role="alert" className="mb-4 rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">{error}</p>}
+    {notice && <p role="status" className="mb-4 rounded-xl bg-accent p-4 text-sm text-accent-foreground">{notice}</p>}
+
+    <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_17.5rem]">
+      <section aria-label="Tulis artikel" className={cn(panel, "overflow-hidden")}>
+        <div className="p-4 sm:p-5">
+          <Label name="Judul">
+            <Input className={cn(field, "rounded-full px-4 font-semibold")} value={draft.title} maxLength={200} disabled={busy} placeholder="Judul artikel"
+              onChange={event => {
+                const title = event.target.value;
+                setDraft(current => ({ ...current, title, slug: !current.slug || (isNew && current.slug === slugify(current.title)) ? slugify(title) : current.slug }));
+                setNotice("");
+              }} />
+          </Label>
+        </div>
+
+        <Tabs defaultValue="write" className="gap-0">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-y px-4 py-3 sm:px-5">
+            <h2 className="text-sm font-semibold">Isi artikel</h2>
+            <TabsList aria-label="Mode editor" className="rounded-full bg-surface">
+              <TabsTrigger value="write" className="rounded-full px-3 text-xs">Tulis</TabsTrigger>
+              <TabsTrigger value="preview" className="rounded-full px-3 text-xs">Pratinjau</TabsTrigger>
+            </TabsList>
+          </div>
+          <TabsContent value="write">
+            <div className="flex flex-wrap items-center gap-1 border-b bg-surface px-3 py-2 sm:px-4">
+              <select aria-label="Gaya teks" className="h-8 rounded-lg px-2 text-sm text-foreground" value="" disabled={busy}
+                onChange={event => format(event.target.value, "", "Judul", true)}>
+                <option value="" disabled>Gaya teks</option><option value="# ">Judul 1</option><option value="## ">Judul 2</option><option value="### ">Judul 3</option>
+              </select>
+              <span aria-hidden="true" className="mx-1 h-5 border-l" />
+              {toolbar.map(({ label, icon: Icon, before, after, prefix }) =>
+                <Button key={label} variant="ghost" size="icon" aria-label={label} title={label} disabled={busy} onClick={() => format(before, after, "Teks", prefix)}><Icon /></Button>,
+              )}
+            </div>
+            <textarea ref={textarea} aria-label="Isi artikel" className="block min-h-88 w-full resize-y bg-background p-4 font-mono text-sm leading-7 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset sm:p-5"
+              value={draft.content} maxLength={30000} disabled={busy} onChange={event => update("content", event.target.value)} placeholder="Tulis isi artikel di sini." />
+          </TabsContent>
+          <TabsContent value="preview" className="min-h-88 space-y-4 bg-background p-4 sm:p-5">
+            {cover && <Image src={cover} alt={draft.coverAlt} width={800} height={450} unoptimized className="aspect-video w-full rounded-xl object-cover" />}
+            <div>
+              <p className="mb-2 text-xs text-muted-foreground">{draft.category} · {BLOG_AUTHOR}</p>
+              <h3 className="break-words text-2xl font-semibold">{draft.title || "Judul artikel"}</h3>
+              {draft.summary && <p className="mt-2 text-sm text-muted-foreground">{draft.summary}</p>}
+            </div>
+            {draft.content ? <Markdown content={draft.content} /> : <p className="text-sm text-muted-foreground">Isi artikel belum ditulis.</p>}
+          </TabsContent>
+        </Tabs>
+      </section>
+
+      <aside aria-label="Pengaturan artikel" className="grid min-w-0 content-start gap-3">
+        <EditorSection title="Detail artikel" open>
+          <ArticleSelect label="Kategori" value={draft.category} options={categoryOptions} disabled={busy}
+            onChange={value => update("category", value as Blog["category"])} />
+          <Label name="Alamat artikel">
+            <div className="relative">
+              <span aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm font-normal text-muted-foreground">/blog/</span>
+              <Input className={cn(field, "pl-14")} value={draft.slug} maxLength={140} disabled={busy} onChange={event => update("slug", event.target.value)} />
+            </div>
+          </Label>
+        </EditorSection>
+
+        <EditorSection title="Gambar cover">
+          {cover
+            ? <Image src={cover} alt={draft.coverAlt} width={560} height={315} unoptimized className="aspect-video w-full rounded-xl border object-cover" />
+            : <div aria-hidden="true" className="grid min-h-22 place-items-center rounded-xl border border-dashed bg-surface text-muted-foreground"><ImageIcon className="size-6" /></div>}
+          <ArticleSelect label="Pilih dari pustaka media" value={cover || noCover} options={coverOptions} disabled={busy}
+            onChange={value => update("coverId", value === noCover ? "" : value)} />
+          {cover && <Label name="Teks alternatif cover"><Input className={field} value={draft.coverAlt} maxLength={200} disabled={busy}
+            onChange={event => update("coverAlt", event.target.value)} placeholder="Deskripsi gambar" /></Label>}
+          {mediaError && <p role="status" className="text-xs text-destructive">{mediaError}</p>}
+          <Link href="/admin/pengaturan?tab=media" className="inline-block text-xs font-medium text-primary hover:underline">Kelola pustaka media</Link>
+        </EditorSection>
+
+        <EditorSection title="Pengaturan terbit">
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input type="checkbox" className="size-4 accent-primary" checked={draft.featured} disabled={busy}
+              onChange={event => update("featured", event.target.checked)} />
+            Tampilkan sebagai unggulan
+          </label>
+          <Label name="Waktu publikasi (WIB)"><Input type="datetime-local" className={field} value={publishTime} disabled={busy} onChange={event => setPublishTime(event.target.value)} /></Label>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="pill-sm" disabled={busy || !publishTime} onClick={() => void persist("Terjadwal")}>Jadwalkan</Button>
+            {draft.status !== "Draft" && <Button variant="ghost" size="pill-sm" disabled={busy} onClick={() => void persist("Draft")}>Jadikan draft</Button>}
+            {!isNew && draft.status !== "Arsip" && <Button variant="ghost" size="pill-sm" disabled={busy} onClick={() => void persist("Arsip")}>Arsipkan</Button>}
+          </div>
+        </EditorSection>
+      </aside>
+    </div>
+  </div>;
 }

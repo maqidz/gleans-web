@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { OrderForm } from "@/features/orders/components/order-form";
+import { displayShieldPricing } from "@/features/orders/lib/shield-pricing";
 import { Breadcrumb } from "@/components/layout/breadcrumb";
 import { CtaBanner } from "@/components/layout/cta-banner";
 import { PageIntro } from "@/components/layout/section-heading";
@@ -12,7 +13,10 @@ export const metadata: Metadata = {
     "Unggah dokumen, bayar dengan QRIS, lalu cek pesanan dan unduh laporan pemeriksaan tanpa perlu membuat akun.",
 };
 
-export default function DeteksiAiPage() {
+export const revalidate = 60;
+
+export default async function DeteksiAiPage() {
+  const { price } = await displayShieldPricing();
   return (
     <>
       <Breadcrumb items={[{ label: "Gleans Shield" }]} />
@@ -22,7 +26,7 @@ export default function DeteksiAiPage() {
           title="Cek Deteksi AI & Plagiarisme"
           description="Unggah dokumenmu, bayar sekali, lalu cek pesanan dan unduh hasil pemeriksaan tanpa perlu akun."
         />
-        <OrderForm />
+        <OrderForm price={price} />
       </section>
       <ToolHighlights
         title="Alur pemesanan"

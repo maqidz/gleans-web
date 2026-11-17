@@ -1,4 +1,5 @@
-export type AdminMedia = {id:string;name:string;alt:string;size:number;blob?:Blob;src?:string};
+export type AdminMedia = {id:string;name:string;alt:string;size:number;blob?:Blob;src?:string;hidden?:boolean};
+export const EDITOR_IMAGE_LIMIT = 4 * 1024 * 1024;
 export function validateMedia(file:File) {
  if(!["image/png","image/jpeg","image/webp","image/gif"].includes(file.type))throw new Error("Gunakan gambar PNG, JPG, WebP, atau GIF.");
  if(!file.size || file.size>10*1024*1024)throw new Error("Ukuran gambar maksimal 10 MB.");

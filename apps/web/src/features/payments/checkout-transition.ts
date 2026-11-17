@@ -13,10 +13,14 @@ export async function requestPaymentAction(id: string, action: "pay" | "check"):
 
 export type CheckoutPreview = Pick<PaymentOrder, "document_name" | "amount"> & { method?: "qris" | "balance" | "quota" };
 
+export class ShieldPriceChanged extends Error {
+  constructor(message: string, readonly amount: number) { super(message); }
+}
+
 type CheckoutTransition = {
   requestId: string;
   preview: CheckoutPreview;
-  reserve: () => Promise<PaymentOrder>;
+  reserve: (expectedAmount: number) => Promise<PaymentOrder>;
   order?: PaymentOrder;
   reservation: Promise<PaymentOrder>;
   result: Promise<{ order: PaymentOrder } | { error: string }>;
@@ -27,7 +31,7 @@ let transition: CheckoutTransition | undefined;
 let expiry: ReturnType<typeof setTimeout> | undefined;
 
 export function startCheckoutTransition(requestId: string, preview: CheckoutPreview, reserve: CheckoutTransition["reserve"]) {
-  const reservation = Promise.resolve().then(reserve);
+  const reservation = Promise.resolve().then(() => reserve(preview.amount));
   const current: CheckoutTransition = {
     requestId,
     preview,

@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { LayoutDashboard, ReceiptText, Users, BookOpen, Megaphone, Settings, Menu, MoreVertical, Monitor, Sun, Moon, LogOut } from "lucide-react";
+import { LayoutDashboard, ReceiptText, Users, Tags, BookOpen, Megaphone, Settings, Menu, MoreVertical, Monitor, Sun, Moon, LogOut } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@gleans/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@gleans/ui/sheet";
@@ -12,7 +12,7 @@ import { AdminOrderAlertsProvider, AdminOrderNotificationToggle } from "./order-
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuItem } from "@gleans/ui/dropdown-menu";
 import { signOutAdmin } from "@/features/auth/actions";
 import { cn } from "@/lib/utils";
-export const adminLinks=[{href:"/admin",label:"Ringkasan",icon:LayoutDashboard},{href:"/admin/pesanan",label:"Pesanan",icon:ReceiptText},{href:"/admin/pelanggan",label:"Pelanggan",icon:Users},{href:"/admin/blog",label:"Blog",icon:BookOpen},{href:"/admin/promosi",label:"Promosi",icon:Megaphone},{href:"/admin/pengaturan",label:"Pengaturan",icon:Settings}];
+export const adminLinks=[{href:"/admin",label:"Ringkasan",icon:LayoutDashboard},{href:"/admin/pesanan",label:"Pesanan",icon:ReceiptText},{href:"/admin/pelanggan",label:"Pelanggan",icon:Users},{href:"/admin/paket-transaksi",label:"Paket & Harga",icon:Tags},{href:"/admin/blog",label:"Blog",icon:BookOpen},{href:"/admin/promosi",label:"Promosi",icon:Megaphone},{href:"/admin/pengaturan",label:"Pengaturan",icon:Settings}];
 function Navigation({close}:{close?:()=>void}){const path=usePathname();return <nav aria-label="Menu admin" className="space-y-2">{adminLinks.map(x=><Link key={x.href} href={x.href} onClick={close} aria-current={(path===x.href||(x.href!=="/admin"&&path.startsWith(x.href+"/")))?"page":undefined} className={cn("flex items-center gap-3 rounded-full px-4 py-3 text-sm hover:bg-accent",(path===x.href||(x.href!=="/admin"&&path.startsWith(x.href+"/")))?"bg-accent font-medium text-primary":"text-muted-foreground")}><x.icon className="size-5 shrink-0"/>{x.label}</Link>)}</nav>;}
 type Appearance = "system" | "light" | "dark";
 function AdminProfile({theme,onTheme,close,email,name}:{theme:Appearance;onTheme:(theme:Appearance)=>void;close?:()=>void;email:string;name:string}) {

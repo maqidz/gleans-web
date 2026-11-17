@@ -21,3 +21,6 @@ export type PaymentOrder = {
   access_code?: string | null;
 };
 export const PAYMENT_DOCUMENT_BUCKET = "shield-sandbox-documents";
+
+export type AccountOrder = Pick<PaymentOrder, "id" | "document_name" | "amount" | "status" | "payment_method" | "created_at" | "fulfillment_status" | "completed_at" | "report_expires_at">;
+export type AccountOrderPage = { orders: AccountOrder[]; total: number; nextPage?: number };

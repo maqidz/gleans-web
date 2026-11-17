@@ -1,20 +1,28 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, MoreVertical, Search, ChevronDown, Check, CircleAlert, Download, Eye, FileText, Upload, ClipboardList, type LucideIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight, MoreVertical, Search, Check, CircleAlert, Download, Eye, FileText, Upload, ClipboardList, type LucideIcon } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@gleans/ui/button";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@gleans/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@gleans/ui/dialog";
+import { FilterDropdown } from "@gleans/ui/filter-dropdown";
 import { uploadPaymentFile } from "@/features/payments/upload-file";
 import type { PaymentOrder } from "@/features/payments/types";
 import { formatBytes, formatRupiah } from "@/lib/format";
-import { SHIELD_PRICE } from "@/lib/plans";
 import { ORDER_ARRIVED_EVENT } from "../lib/order-alerts";
 
 type Order = PaymentOrder & { whatsapp: string; customer_name: string; document_bytes: number };
 const paymentLabels = { draft: "Belum dibayar", creating: "Menyiapkan pembayaran", pending: "Menunggu", paid: "Berhasil", failed: "Gagal", expired: "Kedaluwarsa" };
 const inspectionLabels = { pending: "Antre", processing: "Sedang diperiksa", completed: "Selesai", failed: "Perlu ditindaklanjuti" };
+const paymentOptions = [
+  { value: "all", label: "Semua pembayaran" },
+  ...Object.entries(paymentLabels).map(([value, label]) => ({ value, label })),
+];
+const inspectionOptions = [
+  { value: "all", label: "Semua pemeriksaan" },
+  ...Object.entries(inspectionLabels).map(([value, label]) => ({ value, label })),
+];
 const card = "rounded-[18px] border border-border bg-background p-4 sm:p-5";
 
 export function ShieldOrders() {
@@ -71,15 +79,20 @@ export function ShieldOrders() {
   const pageNumbers = Array.from({length: pages}, (_, index) => index + 1).filter(number => pages <= 7 || number === 1 || number === pages || (currentPage <= 4 ? number <= 5 : currentPage >= pages - 3 ? number >= pages - 4 : Math.abs(number - currentPage) <= 1));
   const metrics = [["TOTAL PESANAN", orders.length], ["TOTAL ANTREAN", orders.filter(o => o.status === "paid" && o.fulfillment_status === "pending").length], ["TOTAL SELESAI", orders.filter(o => o.status === "paid" && o.fulfillment_status === "completed").length], ["PERLU TINDAKAN", orders.filter(o => o.status === "paid" && ["pending", "processing", "failed"].includes(o.fulfillment_status)).length]];
   return <section className="mb-8 min-w-0 space-y-5" aria-label="Pesanan Shield tersimpan">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-semibold sm:text-3xl">Pesanan</h1><p className="mt-2 text-sm text-muted-foreground">Pantau pembayaran, pemeriksaan, dan pengiriman laporan.</p><p className="mt-1 text-sm text-muted-foreground">Tarif dasar Shield: {formatRupiah(SHIELD_PRICE)} per dokumen.</p></div><Button variant="outline" size="pill-sm" className="shadow-none" onClick={() => void load()}>Muat ulang</Button></div>
+    <header>
+      <h1 className="text-2xl font-semibold sm:text-3xl">Pesanan</h1>
+      <p className="mt-2 text-sm text-muted-foreground">Pantau pembayaran, pemeriksaan, dan pengiriman laporan.</p>
+    </header>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{metrics.map(([label, value]) => <section key={label} className={card}><p className="text-xs text-muted-foreground">{label}</p><p className="mt-4 text-2xl font-semibold">{loading ? "—" : value}</p></section>)}</div>
     {error && !selected && <p role="alert" className="text-sm text-destructive">{error}</p>}
     <div className="overflow-hidden rounded-2xl border border-border">
       <div className="flex flex-col gap-4 border-b border-border p-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="shrink-0"><p className="text-xs text-muted-foreground">Total hasil</p><p aria-live="polite" className="mt-1 text-sm font-medium">{loading ? "Memuat…" : `${visible.length} pesanan`}</p></div>
         <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap xl:flex-nowrap">
-          <div className="relative min-w-0 sm:flex-1 xl:flex-none"><select aria-label="Filter pembayaran" value={payment} onChange={e => {setPayment(e.target.value); setPage(1);}} className="h-10 w-full appearance-none rounded-full border border-border bg-background pl-3 pr-9 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary"><option value="all">Semua pembayaran</option>{Object.entries(paymentLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-3 size-4 text-muted-foreground"/></div>
-          <div className="relative min-w-0 sm:flex-1 xl:flex-none"><select aria-label="Filter pemeriksaan" value={filter} onChange={e => {setFilter(e.target.value); setPage(1);}} className="h-10 w-full appearance-none rounded-full border border-border bg-background pl-3 pr-9 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary"><option value="all">Semua pemeriksaan</option>{Object.entries(inspectionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-3 size-4 text-muted-foreground"/></div>
+          <FilterDropdown label="Filter pembayaran" value={payment} options={paymentOptions}
+            className="w-full justify-start sm:w-fit" onChange={value => { setPayment(value); setPage(1); }} />
+          <FilterDropdown label="Filter pemeriksaan" value={filter} options={inspectionOptions}
+            className="w-full justify-start sm:w-fit" onChange={value => { setFilter(value); setPage(1); }} />
           <div className="flex h-10 min-w-0 items-center gap-2 rounded-full bg-surface px-3 focus-within:ring-2 focus-within:ring-primary sm:w-full xl:w-56"><Search aria-hidden="true" className="size-4 shrink-0 text-muted-foreground"/><input aria-label="Cari ID, dokumen, nama, atau WhatsApp" placeholder="Cari pesanan…" value={query} onChange={e => {setQuery(e.target.value); setPage(1);}} className="w-full min-w-0 bg-transparent text-sm outline-none"/></div>
         </div>
       </div>

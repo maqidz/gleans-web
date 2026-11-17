@@ -5,7 +5,8 @@ import { Button } from "@gleans/ui/button";
 import { formatRupiah } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-import { PLANS, SHIELD_PRICE } from "@/lib/plans";
+import { PLANS } from "@/lib/plans";
+import { displayShieldPricing } from "@/features/orders/lib/shield-pricing";
 
 const PLAN_ICONS = {
   starter: FileText,
@@ -13,17 +14,20 @@ const PLAN_ICONS = {
   premium: Layers,
 };
 
-export function Pricing() {
+export async function Pricing() {
+  const { price: shieldPrice, packages } = await displayShieldPricing();
   return (
     <section id="harga" className="section-y scroll-mt-16">
       <div className="container-page flex flex-col gap-10 md:gap-14 lg:gap-20">
         <SectionHeading
           title="Pilih paket sesuai kebutuhanmu"
-          description="Lebih hemat cek plagiarisme, dari tugas hingga skripsi."
+          description={`Cek satu dokumen seharga ${formatRupiah(shieldPrice)}, atau pilih paket untuk beberapa pemeriksaan.`}
         />
         <div className="flex flex-col gap-4 md:grid md:grid-cols-2 lg:grid-cols-3">
           {PLANS.map((plan, i) => {
             const PlanIcon = PLAN_ICONS[plan.id];
+            const individualTotal = plan.checks * shieldPrice;
+            const packagePrice = packages[plan.id];
 
             return (
               <article
@@ -39,11 +43,11 @@ export function Pricing() {
                       <PlanIcon aria-hidden="true" className="size-6" />
                     </span>
                     <div className="flex flex-col items-end gap-1 text-right">
-                      <p className="text-2xl font-semibold">{formatRupiah(plan.price)}</p>
-                      <p className="text-muted-foreground">
+                      <p className="text-2xl font-semibold">{formatRupiah(packagePrice)}</p>
+                      {individualTotal > packagePrice && <p className="text-muted-foreground">
                         <span className="sr-only">Harga jika dibeli satuan: </span>
-                        <s>{formatRupiah(plan.checks * SHIELD_PRICE)}</s>
-                      </p>
+                        <s>{formatRupiah(individualTotal)}</s>
+                      </p>}
                     </div>
                   </div>
                   <div className="flex flex-col gap-6">

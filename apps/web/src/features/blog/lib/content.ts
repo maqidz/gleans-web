@@ -13,6 +13,8 @@ export type PostMeta = {
   author: string;
   category: BlogCategory;
   cover?: string;
+  coverAlt?: string;
+  featured?: boolean;
   readingMinutes: number;
 };
 

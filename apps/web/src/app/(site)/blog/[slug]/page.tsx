@@ -5,9 +5,12 @@ import { PostByline } from "@/features/blog/components/blog-card";
 import { BlogCover } from "@/features/blog/components/blog-cover";
 import { Breadcrumb } from "@/components/layout/breadcrumb";
 import { CtaBanner } from "@/components/layout/cta-banner";
-import { getAllPosts, getPost } from "@/features/blog/lib/content";
+import { getAllPosts } from "@/features/blog/lib/content";
+import { getPublishedArticle } from "@/features/admin/lib/site-editor";
 
 type Params = { params: Promise<{ slug: string }> };
+
+export const revalidate = 60;
 
 export function generateStaticParams() {
   return getAllPosts().map((post) => ({ slug: post.slug }));
@@ -15,14 +18,14 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
-  const post = getPost(slug);
+  const post = await getPublishedArticle(slug);
   if (!post) return { title: "Artikel tidak ditemukan" };
   return { title: post.title, description: post.excerpt };
 }
 
 export default async function BlogDetailPage({ params }: Params) {
   const { slug } = await params;
-  const post = getPost(slug);
+  const post = await getPublishedArticle(slug);
   if (!post) notFound();
 
   return (
@@ -38,7 +41,7 @@ export default async function BlogDetailPage({ params }: Params) {
           </header>
           <BlogCover post={post} size="hero" />
           <div className="prose-article">
-            <MDXRemote source={post.content} />
+            <MDXRemote source={post.content} options={{ mdxOptions: { format: "md" }, blockJS: true }} />
           </div>
         </div>
       </article>

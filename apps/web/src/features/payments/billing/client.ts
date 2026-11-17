@@ -3,14 +3,18 @@
 import { useEffect, useState } from "react";
 import type { BillingTotals } from "./types";
 
-class BillingRequestError extends Error {
-  constructor(message: string, readonly status: number) { super(message); }
+export class BillingRequestError extends Error {
+  constructor(message: string, readonly status: number, readonly updatedPrice?: number) { super(message); }
 }
 
 export async function billingRequest<T>(path = "", options?: RequestInit): Promise<T> {
   const response = await fetch(`/api/payments/billing${path}`, { cache: "no-store", ...options });
   const data = await response.json();
-  if (!response.ok) throw new BillingRequestError(data.error || "Paket & Saldo belum dapat dimuat.", response.status);
+  if (!response.ok) throw new BillingRequestError(
+    data.error || "Paket & Saldo belum dapat dimuat.",
+    response.status,
+    data.code === "BILLING_PRICE_CHANGED" ? data.amount : undefined,
+  );
   return data;
 }
 

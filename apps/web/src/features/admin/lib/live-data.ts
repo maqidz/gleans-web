@@ -2,6 +2,7 @@ import type { AdminState } from "./model";
 
 export type AdminOrderRow = {
   id: string; owner_id: string | null; customer_name: string; whatsapp: string;
+  email?: string | null;
   document_name: string; amount: number; status: string;
   fulfillment_status: string; created_at: string; completed_at: string | null;
 };
@@ -18,7 +19,7 @@ export function mapAdminOrders(rows: AdminOrderRow[]): AdminState {
     const customerId = row.owner_id || `guest:${phone || row.id}`;
     if (!customers.has(customerId)) customers.set(customerId, {
       id: customerId, name: row.customer_name || "Pelanggan tamu", whatsapp: row.whatsapp,
-      email: "", balance: 0, quota: 0,
+      email: row.owner_id ? row.email || "" : "", balance: 0, quota: 0,
     });
     state.orders.push({ id: row.id, customerId, document: row.document_name, amount: row.amount,
       payment: row.status === "paid" ? "Berhasil" : row.status === "expired" ? "Kedaluwarsa" : row.status === "failed" ? "Gagal" : "Menunggu",

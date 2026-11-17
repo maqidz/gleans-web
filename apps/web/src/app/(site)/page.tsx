@@ -6,10 +6,14 @@ import { LatestBlog } from "@/components/home/latest-blog";
 import { Pricing } from "@/components/home/pricing";
 import { SocialProof } from "@/components/home/social-proof";
 import { Testimonials } from "@/components/home/testimonials";
+import { HomePromotions } from "@/components/home/promotions";
+
+export const revalidate = 60;
 
 export default function HomePage() {
   return (
     <>
+      <HomePromotions />
       <Hero />
       <SocialProof />
       <Advantages />

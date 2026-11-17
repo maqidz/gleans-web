@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, Pencil } from "lucide-react";
+import { Eye, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@gleans/ui/button";
 import { formatRupiah } from "@/lib/format";
 import { type AdminState, type RecordData } from "@/features/admin/lib/model";
@@ -28,12 +28,13 @@ function campaignStatus(p: Promo) {
   return "Aktif";
 }
 
-export function AdminContentTable({ module, items, onEdit, onPreview, onToggle }: {
+export function AdminContentTable<T extends RecordData>({ module, items, onEdit, onPreview, onToggle, onDelete }: {
   module: "blog" | "promosi";
-  items: RecordData[];
-  onEdit: (item: RecordData) => void;
-  onPreview: (item: RecordData) => void;
-  onToggle: (item: RecordData) => void;
+  items: T[];
+  onEdit: (item: T) => void;
+  onPreview: (blog: Blog) => void;
+  onToggle: (item: T) => void;
+  onDelete?: (promo: Promo) => void;
 }) {
   const isBlog = module === "blog";
   const columns = isBlog ? ["ARTIKEL", "KATEGORI", "STATUS", "UNGGULAN", "AKSI"] : ["KAMPANYE", "JENIS", "PERIODE", "STATUS", "AKTIFKAN", "AKSI"];
@@ -41,7 +42,7 @@ export function AdminContentTable({ module, items, onEdit, onPreview, onToggle }
     <p className="mb-3 text-xs text-muted-foreground sm:hidden">Geser tabel untuk melihat semua kolom.</p>
     <div role="region" aria-label={`Tabel ${isBlog ? "blog" : "promosi"}`} tabIndex={0} className="overflow-x-auto rounded-2xl border outline-none focus-visible:ring-2 focus-visible:ring-primary">
       <table className={`w-full text-sm ${isBlog ? "min-w-[800px]" : "min-w-[880px]"}`}>
-        <caption className="sr-only">Daftar {isBlog ? "artikel" : "promosi"} demo Gleans.</caption>
+        <caption className="sr-only">Daftar {isBlog ? "artikel" : "promosi"} Gleans.</caption>
         <thead className="bg-surface text-xs text-muted-foreground"><tr>{columns.map(x => <th key={x} scope="col" className={`whitespace-nowrap px-4 py-4 text-left font-medium ${x === "AKSI" ? "sticky right-0 bg-surface" : ""}`}>{x}</th>)}</tr></thead>
         <tbody className="divide-y">{items.map(item => {
           const blog = isBlog ? item as Blog : undefined;
@@ -49,12 +50,17 @@ export function AdminContentTable({ module, items, onEdit, onPreview, onToggle }
           const title = blog?.title || promo?.name || "";
           const status = promo ? campaignStatus(promo) : blog?.status || "";
           return <tr key={item.id} className="hover:bg-surface/50">
-            <td className={cell+" min-w-64 max-w-md"}><p className="break-words font-semibold">{title}</p><p className="mt-1 break-all text-xs text-muted-foreground">{blog ? `/blog/${blog.slug}` : promo?.title}</p>{promo?.type === "Kode promo" && <p className="mt-2 text-xs text-primary">{promo.code} · {formatRupiah(promo.discount)}</p>}</td>
+            <td className={cell+" min-w-64 max-w-md"}><p className="break-words font-semibold">{title}</p><p className="mt-1 break-all text-xs text-muted-foreground">{blog ? `/blog/${blog.slug}` : promo?.title}</p>{promo?.type === "Kode promo" && <p className="mt-2 text-xs text-primary">{promo.code} · {promo.discountType === "percentage" ? `${promo.discount}%` : formatRupiah(promo.discount)}</p>}</td>
             {blog && <td className={cell+" whitespace-nowrap"}><Badge>{blog.category}</Badge></td>}
             {promo && <><td className={cell+" whitespace-nowrap"}>{promo.type}</td><td className={cell+" whitespace-nowrap text-xs leading-6"}>{day(promo.start)}<br/><span className="text-muted-foreground">s.d. {day(promo.end)}</span></td></>}
             <td className={cell}><Badge active={status === "Terbit" || status === "Aktif"}>{status}</Badge></td>
             <td className={cell}><Toggle label={isBlog ? `Artikel unggulan ${title}` : `Aktifkan promosi ${title}`} checked={blog ? blog.featured : !!promo?.active} onChange={() => onToggle(item)}/></td>
-            <td className={cell+" sticky right-0 border-l bg-white"}><div className="flex items-center gap-2"><Button variant="outline" size="icon" className="rounded-[10px] shadow-none" aria-label={`Preview ${title}`} onClick={() => onPreview(item)}><Eye className="size-4"/></Button><Button variant="outline" size="icon" className="rounded-[10px] shadow-none" aria-label={`Kelola ${title}`} onClick={() => onEdit(item)}><Pencil className="size-4"/></Button></div></td>
+            <td className={cell+" sticky right-0 border-l bg-white"}><div className="flex items-center gap-2">
+              {blog && <Button variant="outline" size="icon" className="rounded-[10px] shadow-none" aria-label={`Preview ${title}`} onClick={() => onPreview(blog)}><Eye className="size-4"/></Button>}
+              <Button variant="outline" size="icon" className="rounded-[10px] shadow-none" aria-label={`Kelola ${title}`} onClick={() => onEdit(item)}><Pencil className="size-4"/></Button>
+              {promo && onDelete && <Button variant="outline" size="icon" className="rounded-[10px] text-destructive shadow-none hover:bg-destructive/10 hover:text-destructive"
+                aria-label={`Hapus promosi ${title}`} onClick={() => onDelete(promo)}><Trash2 className="size-4" /></Button>}
+            </div></td>
           </tr>;
         })}{!items.length && <tr><td colSpan={columns.length} className="px-4 py-12 text-center text-muted-foreground">Tidak ada hasil. Coba kata kunci atau filter lain.</td></tr>}</tbody>
       </table>

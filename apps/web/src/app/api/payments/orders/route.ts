@@ -1,14 +1,16 @@
 import { reserveInvoice } from "@/features/payments/server/invoice";
 import { z } from "zod";
 import { dashboardUser, serverClient } from "@/features/auth/server";
+import { readActivePromo } from "@/features/admin/lib/site-editor";
 import { resolvePromo, whatsappSchema } from "@/features/orders/lib/pricing";
-import { SHIELD_PRICE } from "@/lib/plans";
+import { readShieldPrice } from "@/features/orders/lib/shield-pricing";
+import { MAX_SHIELD_PRICE, SHIELD_PRICE } from "@/lib/plans";
 import { duitkuConfig } from "@/features/payments/server/duitku";
-import { paymentAdmin, ORDER_COLUMNS, publicOrder, type StoredOrder } from "@/features/payments/server/repository";
+import { ORDER_COLUMNS, paymentAdmin, publicOrder, type StoredOrder } from "@/features/payments/server/repository";
 import { guestSession, accessDigest, orderAccessCode } from "@/features/payments/server/guest";
 import { json, paymentError, sameOrigin } from "@/features/payments/server/http";
 export const runtime = "nodejs";
-const schema = z.object({ requestId: z.string().uuid(), ticketId: z.string().uuid(), words: z.number().int().min(0).max(25000), whatsapp: whatsappSchema, email: z.string().trim().email().max(50).optional(), name: z.string().trim().min(1).max(80).optional(), promo: z.string().max(40).optional(), method: z.enum(["qris", "balance", "quota"]).default("qris") }).strict();
+const schema = z.object({ requestId: z.string().uuid(), ticketId: z.string().uuid(), words: z.number().int().min(0).max(25000), whatsapp: whatsappSchema, email: z.string().trim().email().max(50).optional(), name: z.string().trim().min(1).max(80).optional(), promo: z.string().max(40).optional(), method: z.enum(["qris", "balance", "quota"]).default("qris"), expectedAmount: z.number().int().min(1).max(MAX_SHIELD_PRICE).optional() }).strict();
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return json({ error: "Permintaan tidak diizinkan." }, 403);
   try {
@@ -19,14 +21,37 @@ export async function POST(request: Request) {
     if (input.method !== "qris" && !user) return json({ error: "Masuk untuk menggunakan saldo atau kuota Gleans." }, 401);
     if (!guest) return json({ error: "Unggah dokumen terlebih dahulu." }, 400);
     const email = input.email || user?.email || "";
-    const promo = input.promo ? resolvePromo(input.promo, SHIELD_PRICE) : null;
-    if (input.promo && !promo) return json({ error: "Kode promo tidak valid." }, 400);
+    const price = await readShieldPrice();
+    const promo = input.promo ? await readActivePromo(input.promo, price) : null;
+    const invalidPromo = Boolean(input.promo && !promo);
+    const amount = price - (promo?.discount ?? 0);
     const admin = paymentAdmin();
+    const created = (order: StoredOrder) => json({
+      order: publicOrder(order),
+      access_code: order.guest_hash === guest.hash ? orderAccessCode(guest.secret, order.id) : null,
+    }, 201);
+    const expectedAmount = input.expectedAmount ?? SHIELD_PRICE - (input.promo ? resolvePromo(input.promo, SHIELD_PRICE)?.discount ?? 0 : 0);
+    if (invalidPromo || (input.method !== "quota" && expectedAmount !== amount)) {
+      // A retry of a request that already created an invoice keeps its original amount.
+      const existing = admin.database.from("duitku_orders").select(`${ORDER_COLUMNS},guest_hash`).eq("request_key", input.requestId);
+      const scoped = !user ? existing.eq("guest_hash", guest.hash)
+        : input.method !== "qris" ? existing.eq("owner_id", user.id)
+        : existing.or(`guest_hash.eq.${guest.hash},owner_id.eq.${user.id}`);
+      const { data, error } = await scoped.limit(1).maybeSingle();
+      if (error) throw new Error("DATABASE_UNAVAILABLE");
+      if (data) {
+        const existingMethod = data.payment_method === "balance" || data.payment_method === "quota" ? data.payment_method : "qris";
+        if (existingMethod !== input.method) return json({ error: "Pesanan ini sudah memakai metode pembayaran lain." }, 409);
+        return created(data as StoredOrder);
+      }
+      if (invalidPromo) return json({ error: "Kode promo sudah tidak berlaku. Kembali ke formulir untuk melanjutkan pesanan." }, 400);
+      return json({ error: "Tarif Shield berubah. Periksa total baru sebelum melanjutkan pembayaran.", code: "SHIELD_PRICE_CHANGED", amount }, 409);
+    }
     const { data, error } = await reserveInvoice(id => {
       const args = {
         p_id: id, p_owner: user?.id ?? null, p_guest: guest.hash, p_access: accessDigest(orderAccessCode(guest.secret, id)), p_request: input.requestId, p_ticket: input.ticketId,
         p_email: email, p_name: input.name || user?.name || "Pelanggan Gleans", p_whatsapp: input.whatsapp,
-        p_words: input.words, p_amount: SHIELD_PRICE - (promo?.discount ?? 0), p_promo: promo?.code ?? null,
+        p_words: input.words, p_amount: amount, p_promo: promo?.code ?? null,
       };
       return input.method === "qris"
         ? admin.database.rpc("reserve_guest_order", args)
@@ -44,13 +69,22 @@ export async function POST(request: Request) {
     if (input.method === "qris" && ["balance", "quota"].includes(order.payment_method ?? "")) {
       return json({ error: "Pesanan ini sudah memakai metode pembayaran lain." }, 409);
     }
-    return json({ order: publicOrder(order), access_code: order.guest_hash === guest.hash ? orderAccessCode(guest.secret, order.id) : null }, 201);
+    return created(order);
   } catch (error) { if (error instanceof SyntaxError) return json({ error: "Data tidak valid." }, 400); return paymentError(error); }
 }
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await dashboardUser(); if (!user) return json({ error: "Silakan masuk terlebih dahulu." }, 401);
-    const { data, error } = await (await serverClient()).database.from("duitku_orders").select(ORDER_COLUMNS).eq("owner_id", user.id).order("created_at", { ascending: false }).limit(30);
-    if (error) throw new Error("DATABASE_UNAVAILABLE"); return json({ orders: data });
-  } catch (error) { return paymentError(error); }
+    const page = Number(new URL(request.url).searchParams.get("page") ?? "0");
+    if (!Number.isSafeInteger(page) || page < 0 || page > 100_000) return json({ error: "Halaman pesanan tidak valid." }, 400);
+    const pageSize = 30;
+    const start = page * pageSize;
+    const { data, error, count } = await (await serverClient()).database.from("duitku_orders")
+      .select("id,document_name,amount,status,payment_method,created_at,fulfillment_status,completed_at,report_expires_at", { count: "exact" })
+      .eq("owner_id", user.id)
+      .order("created_at", { ascending: false }).order("id", { ascending: false })
+      .range(start, start + pageSize - 1);
+    if (error || !data || count == null) return json({ error: "Pesanan belum dapat dimuat. Coba lagi." }, 503);
+    return json({ orders: data, total: count, nextPage: data.length > 0 && start + data.length < count ? page + 1 : undefined });
+  } catch { return json({ error: "Pesanan belum dapat dimuat. Coba lagi." }, 503); }
 }

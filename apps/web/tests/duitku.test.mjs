@@ -5,14 +5,18 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
 const require = createRequire(import.meta.url);
-async function moduleFrom(path, substitutions={}) {
+async function moduleUrlFrom(path, substitutions={}) {
   let source=(await readFile(path,'utf8')).replace('import "server-only";','');
   source=source.replace('"zod"',JSON.stringify(pathToFileURL(require.resolve('zod')).href));
   for (const [before, after] of Object.entries(substitutions)) source=source.replace(before,after);
   const js=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
-  return import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`);
+  return `data:text/javascript;base64,${Buffer.from(js).toString('base64')}`;
 }
+const moduleFrom = async (path, substitutions) => import(await moduleUrlFrom(path, substitutions));
 const gateway=await moduleFrom('src/features/payments/server/duitku.ts');
+const pricingUrl = await moduleUrlFrom('src/features/orders/lib/pricing.ts', {
+  '"@/lib/format"': JSON.stringify(await moduleUrlFrom('src/lib/format.ts')),
+});
 
 test('Duitku signature uses HMAC-SHA256 and rejects forged/malformed callbacks',()=>{
   assert.equal(gateway.signature('what do ya want for nothing?','Jefe'),'5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843');
@@ -57,10 +61,68 @@ test('invoice signs the server amount and rejects unexpected merchant, amount an
   }finally{globalThis.fetch=originalFetch;process.env=previous;}
 });
 test('server pricing recalculates known promotions and refuses unknown codes',async()=>{
-  const {resolvePromo}=await moduleFrom('src/features/orders/lib/pricing.ts');
+  const {resolvePromo}=await import(pricingUrl);
   assert.equal(resolvePromo('gleans10',8000).discount,800);
   assert.equal(resolvePromo('SKRIPSIAMAN',8000).discount,2000);
   assert.equal(resolvePromo('fake',8000),null);
+  assert.equal(resolvePromo('MAHASISWA',1000).discount,999);
+});
+
+test('a stale Shield checkout needs approval and an invoice retry keeps the stored price', async () => {
+  const reserved = [];
+  const orderId = 'GLS-0123456789AB';
+  let amount = 10_000;
+  let existing = null;
+  const query = {
+    select: () => query, eq: () => query, or: () => query, limit: () => query,
+    maybeSingle: async () => ({ data: existing, error: null }),
+  };
+  globalThis.__shieldQuoteTest = {
+    dashboardUser: async () => ({ id: '550e8400-e29b-41d4-a716-446655440000' }),
+    readShieldPrice: async () => amount,
+    guestSession: async () => ({ hash: 'guest', secret: 'secret' }),
+    paymentAdmin: () => ({ database: {
+      from: () => query,
+      rpc: async (name, args) => {
+        reserved.push({ name, amount: args.p_amount });
+        return { data: { id: orderId, amount: args.p_amount, guest_hash: 'guest', payment_method: args.p_method }, error: null };
+      },
+    } }),
+  };
+  try {
+    const { POST } = await moduleFrom('src/app/api/payments/orders/route.ts', {
+      'import { reserveInvoice } from "@/features/payments/server/invoice";': 'const reserveInvoice = reserve => reserve("GLS-0123456789AB");',
+      'import { dashboardUser, serverClient } from "@/features/auth/server";': 'const {dashboardUser} = globalThis.__shieldQuoteTest;',
+      '"@/features/orders/lib/pricing"': JSON.stringify(pricingUrl),
+      'import { readShieldPrice } from "@/features/orders/lib/shield-pricing";': 'const {readShieldPrice} = globalThis.__shieldQuoteTest;',
+      'import { readActivePromo } from "@/features/admin/lib/site-editor";': 'const readActivePromo = (code, price) => resolvePromo(code, price);',
+      '"@/lib/plans"': JSON.stringify(await moduleUrlFrom('src/lib/plans.ts')),
+      'import { duitkuConfig } from "@/features/payments/server/duitku";': 'const duitkuConfig = () => ({});',
+      'import { ORDER_COLUMNS, paymentAdmin, publicOrder, type StoredOrder } from "@/features/payments/server/repository";': 'const {paymentAdmin} = globalThis.__shieldQuoteTest; const ORDER_COLUMNS = "id,amount"; const publicOrder = order => order;',
+      'import { guestSession, accessDigest, orderAccessCode } from "@/features/payments/server/guest";': 'const {guestSession} = globalThis.__shieldQuoteTest; const accessDigest = () => "digest"; const orderAccessCode = () => "code";',
+      '"@/features/payments/server/http"': JSON.stringify(await moduleUrlFrom('src/features/payments/server/http.ts')),
+    });
+    const submit = expectedAmount => POST(new Request('http://localhost:3000/api/payments/orders', {
+      method: 'POST', headers: { origin: 'http://localhost:3000', host: 'localhost:3000' },
+      body: JSON.stringify({ requestId: '550e8400-e29b-41d4-a716-446655440001', ticketId: '550e8400-e29b-41d4-a716-446655440002', words: 42, whatsapp: '081234567890', promo: 'GLEANS10', method: 'balance', expectedAmount }),
+    }));
+    const stale = await submit(7200);
+    assert.equal(stale.status,409);
+    assert.equal((await stale.json()).amount,9000);
+    assert.deepEqual(reserved,[]);
+
+    const confirmed = await submit(9000);
+    assert.equal(confirmed.status,201);
+    assert.deepEqual(reserved,[{ name: 'reserve_billed_shield_order', amount: 9000 }]);
+    existing = (await confirmed.json()).order;
+    amount = 11_000;
+    const retry = await submit(9000);
+    assert.equal(retry.status,201);
+    assert.equal((await retry.json()).order.amount,9000);
+    assert.equal(reserved.length,1);
+  } finally {
+    delete globalThis.__shieldQuoteTest;
+  }
 });
 test('reconciliation verifies amount, ID and reference; paid state cannot regress',async()=>{
   let response={merchantOrderId:'GLS-test',amount:'10000',reference:'ref',statusCode:'01'};const writes=[];

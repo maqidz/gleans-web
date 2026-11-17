@@ -1,3 +1,5 @@
+import type { PackagePrices } from "@/lib/plans";
+
 export const BILLING_ID = /^GLB-[0-9A-F]{24}$/;
 export const MIN_TOPUP = 10_000;
 export const MAX_TOPUP = 1_000_000;
@@ -16,4 +18,4 @@ export type BillingTransaction = {
 };
 
 export type BillingTotals = { balance: number; quota: number };
-export type BillingSnapshot = BillingTotals & { transactions: BillingTransaction[] };
+export type BillingSnapshot = BillingTotals & { transactions: BillingTransaction[]; packagePrices: PackagePrices };

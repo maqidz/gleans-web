@@ -10,7 +10,9 @@ export async function GET(request: Request) {
       if (error) throw new Error("DATABASE_UNAVAILABLE");
       return json({ latest: data?.[0] ?? null });
     }
-    const { data, error } = await paymentAdmin().database.from("duitku_orders").select(`${ORDER_COLUMNS},whatsapp,customer_name`).order("created_at", { ascending: false }).limit(50);
-    if (error) throw new Error("DATABASE_UNAVAILABLE"); return json({ orders: data });
+    const { data, error } = await paymentAdmin().database.from("duitku_orders")
+      .select(`${ORDER_COLUMNS},whatsapp,customer_name`).order("created_at", { ascending: false }).limit(50);
+    if (error) throw new Error("DATABASE_UNAVAILABLE");
+    return json({ orders: data });
   } catch { return json({ error: "Pesanan belum dapat dimuat." }, 503); }
 }

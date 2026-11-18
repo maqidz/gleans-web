@@ -1,14 +1,13 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ShieldPriceChanged, startCheckoutTransition } from "@/features/payments/checkout-transition";
 import { useBillingTotals } from "@/features/payments/billing/client";
 import { finishPaymentUpload, preparePaymentUpload, uploadPaymentFile } from "@/features/payments/upload-file";
 import { useDropzone } from "react-dropzone";
-import { Layers, Loader2, QrCode, Wallet, X } from "lucide-react";
+import { FileText, FileUp, Layers, Loader2, Phone, QrCode, TicketPercent, Wallet, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@gleans/ui/button";
 import { Input } from "@gleans/ui/input";
@@ -160,7 +159,7 @@ export function OrderForm({ price: initialPrice }: { price: number }) {
       <section className="flex min-w-0 flex-col gap-6 rounded-[24px] border bg-white p-4">
         <header className="flex min-w-0 items-center gap-4">
           <span className="bg-surface flex size-12 shrink-0 items-center justify-center rounded-[12px]">
-            <Image src="/images/icon-document.png" alt="" width={20} height={20} className="size-5" />
+            <FileText aria-hidden="true" className="size-5" />
           </span>
           <div className="flex min-w-0 flex-col gap-0.5">
             <h2 className="text-lg font-semibold">Upload Dokumen</h2>
@@ -170,13 +169,7 @@ export function OrderForm({ price: initialPrice }: { price: number }) {
 
         <Field label="No. WhatsApp" htmlFor="whatsapp" error={whatsappError}>
           <div className="relative">
-            <Image
-              src="/images/icon-phone.png"
-              alt=""
-              width={20}
-              height={20}
-              className="pointer-events-none absolute top-1/2 left-5 size-5 -translate-y-1/2"
-            />
+            <Phone aria-hidden="true" className="pointer-events-none absolute top-1/2 left-5 size-5 -translate-y-1/2 text-muted-foreground" />
             <Input
               id="whatsapp"
               type="tel"
@@ -196,13 +189,7 @@ export function OrderForm({ price: initialPrice }: { price: number }) {
 
         <Field label="Kode Promo" htmlFor="promo">
           <div className="relative">
-            <Image
-              src="/images/icon-ticket.png"
-              alt=""
-              width={20}
-              height={20}
-              className="pointer-events-none absolute top-1/2 left-5 size-5 -translate-y-1/2"
-            />
+            <TicketPercent aria-hidden="true" className="pointer-events-none absolute top-1/2 left-5 size-5 -translate-y-1/2 text-muted-foreground" />
             <Input
               id="promo"
               value={promoInput}
@@ -240,7 +227,7 @@ export function OrderForm({ price: initialPrice }: { price: number }) {
               {reading ? (
                 <Loader2 className="size-5 animate-spin" />
               ) : (
-                <Image src="/images/icon-upload.png" alt="" width={20} height={20} className="size-5" />
+                <FileUp aria-hidden="true" className="size-5" />
               )}
             </span>
             <div className="flex w-full min-w-0 flex-col gap-1">
@@ -264,7 +251,7 @@ export function OrderForm({ price: initialPrice }: { price: number }) {
           {document ? (
             <div className="flex min-w-0 items-start gap-3">
               <span className="bg-surface flex size-12 shrink-0 items-center justify-center rounded-[12px]">
-                <Image src="/images/icon-document.png" alt="" width={20} height={20} className="size-5" />
+                <FileText aria-hidden="true" className="size-5" />
               </span>
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <p className="truncate font-semibold">{document.file.name}</p>

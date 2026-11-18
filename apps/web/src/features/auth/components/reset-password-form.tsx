@@ -21,8 +21,8 @@ export function ResetPasswordForm({ token }: { token?: string }) {
   }
   return <AuthCard title="Reset Kata Sandi" description={success ? "Kata sandi berhasil diperbarui. Silakan masuk." : token ? "Buat kata sandi baru untuk akun Anda." : "Tautan tidak valid atau kedaluwarsa. Minta tautan pemulihan baru."} footer={<Link href={token ? "/masuk" : "/lupa-kata-sandi"} className="text-primary font-medium">{token ? "Kembali ke halaman masuk" : "Minta tautan pemulihan"}</Link>}>
     {token && !success && <form onSubmit={handleSubmit(submit)} className="flex flex-col gap-6">
-      <AuthField label="Kata sandi baru" htmlFor="password"><PasswordInput id="password" icon="/images/icon-lock.png" autoComplete="new-password" aria-invalid={Boolean(errors.password)} aria-describedby={errors.password ? "password-requirements" : undefined} {...register("password")} />{errors.password && <p id="password-requirements" role="alert" className="text-sm text-destructive">{passwordRequirements}</p>}</AuthField>
-      <AuthField label="Konfirmasi kata sandi" htmlFor="confirmPassword" error={errors.confirmPassword?.message}><PasswordInput id="confirmPassword" icon="/images/icon-lock.png" autoComplete="new-password" {...register("confirmPassword")} /></AuthField>
+      <AuthField label="Kata sandi baru" htmlFor="password"><PasswordInput id="password" autoComplete="new-password" aria-invalid={Boolean(errors.password)} aria-describedby={errors.password ? "password-requirements" : undefined} {...register("password")} />{errors.password && <p id="password-requirements" role="alert" className="text-sm text-destructive">{passwordRequirements}</p>}</AuthField>
+      <AuthField label="Konfirmasi kata sandi" htmlFor="confirmPassword" error={errors.confirmPassword?.message}><PasswordInput id="confirmPassword" autoComplete="new-password" {...register("confirmPassword")} /></AuthField>
       {serverError && <p role="alert" className="text-destructive text-sm">{serverError}</p>}
       <Button type="submit" size="pill" disabled={isSubmitting}>{isSubmitting ? "Memproses…" : "Simpan kata sandi"}</Button>
     </form>}

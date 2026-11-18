@@ -34,7 +34,7 @@ export function DashboardOverview() {
         <p className="mt-2 text-sm leading-relaxed text-white/75">Siap menyelesaikan tulisanmu? Mulai bersama Gleans.</p>
         <Button asChild size="pill-sm" className="mt-5"><Link href="/deteksi-ai"><Plus />Buat Pesanan</Link></Button>
       </div>
-      <Image src="/images/gleans-illustration.png" alt="" width={1340} height={980} className="w-28 shrink-0 object-contain sm:w-48 xl:w-60" priority />
+      <Image src="/images/gleans-illustration-720.webp" alt="" width={1340} height={980} className="w-28 shrink-0 object-contain sm:w-48 xl:w-60" priority />
     </section>
     <div className="grid gap-4 md:grid-cols-3">
       {stats.map(stat => <Panel key={stat.label} className="border border-border bg-white">

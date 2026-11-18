@@ -3,17 +3,17 @@ import { SectionHeading } from "@/components/layout/section-heading";
 
 const ITEMS = [
   {
-    icon: "/images/icon-verify.png",
+    icon: "/images/icon-verify.webp",
     title: "Platform Resmi",
     body: "Menggunakan sistem kredibel yang teruji dan diakui standar universitas tanpa biaya lisensi mahal.",
   },
   {
-    icon: "/images/icon-tag.png",
+    icon: "/images/icon-tag.webp",
     title: "Murah & Cepat",
     body: "Sistem otomatisasi memastikan analisis dan pemrosesan dokumen selesai secara presisi dalam hitungan menit.",
   },
   {
-    icon: "/images/icon-shield.png",
+    icon: "/images/icon-shield.webp",
     title: "Keamanan Data",
     body: "Dokumen dihapus secara otomatis dari sistem setelah pemrosesan selesai untuk menjamin kerahasiaan dokumen.",
   },

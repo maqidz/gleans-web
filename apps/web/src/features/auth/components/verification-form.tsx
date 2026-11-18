@@ -21,8 +21,8 @@ export function VerificationForm({ email: initialEmail = "", method = "link", st
   }
   return <AuthCard title="Verifikasi Email" description={status === "success" ? "Email berhasil diverifikasi. Silakan masuk ke akun Anda." : status === "error" ? "Tautan tidak valid atau kedaluwarsa. Kirim ulang email verifikasi." : method === "code" ? "Masukkan kode 6 digit yang dikirim ke email Anda." : "Buka tautan verifikasi di email Anda sebelum masuk."} footer={<Link href="/masuk" className="text-primary font-medium">Kembali ke halaman masuk</Link>}>
     {status !== "success" && <form onSubmit={submit} className="flex flex-col gap-6">
-      <AuthField label="Email" htmlFor="verification-email"><AuthInput id="verification-email" icon="/images/icon-mail.png" type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} /></AuthField>
-      {method === "code" && <AuthField label="Kode verifikasi" htmlFor="otp"><AuthInput id="otp" icon="/images/icon-lock.png" required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={otp} onChange={e => setOtp(e.target.value)} /></AuthField>}
+      <AuthField label="Email" htmlFor="verification-email"><AuthInput id="verification-email" icon="mail" type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} /></AuthField>
+      {method === "code" && <AuthField label="Kode verifikasi" htmlFor="otp"><AuthInput id="otp" icon="lock" required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={otp} onChange={e => setOtp(e.target.value)} /></AuthField>}
       <Button type="submit" size="pill" disabled={pending}>{pending ? "Memproses…" : method === "code" ? "Verifikasi" : "Kirim ulang email"}</Button>
       {method === "code" && <Button type="button" variant="outline" disabled={pending} onClick={async () => { setPending(true); try { const result = await resendVerification(email); if (result.error) toast.error(result.error); else toast.success("Kode baru telah dikirim."); } finally { setPending(false); } }}>Kirim ulang kode</Button>}
     </form>}

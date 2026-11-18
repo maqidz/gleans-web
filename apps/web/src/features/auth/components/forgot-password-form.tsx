@@ -46,7 +46,7 @@ export function ForgotPasswordForm() {
         <AuthField label="Email" htmlFor="email" error={errors.email?.message}>
           <AuthInput
             id="email"
-            icon="/images/icon-mail.png"
+            icon="mail"
             type="email"
             autoComplete="email"
             placeholder="kamu@gmail.com"

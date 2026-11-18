@@ -128,8 +128,10 @@ test('real legacy DOC is read by the browser worker and converted', async () => 
 });
 
 test('PNG and JPEG produce a one-page PDF with embedded image content', async () => {
-  for (const [name, path] of [['image.png', 'public/images/icon-upload.png'], ['image.jpg', 'public/images/blog-thumbnail-tutorial.jpg']]) {
-    const result = await convertToPdf(new File([await readFile(path)], name), context);
+  const png = createCanvas(24, 24);
+  png.getContext('2d').fillRect(0, 0, 24, 24);
+  for (const [name, bytes] of [['image.png', png.toBuffer('image/png')], ['image.jpg', await readFile('public/images/blog-thumbnail-tutorial.jpg')]]) {
+    const result = await convertToPdf(new File([bytes], name), context);
     const doc = await PDFDocument.load(result.bytes);
     assert.equal(doc.getPageCount(), 1);
     assert.ok(result.bytes.length > 100);

@@ -36,11 +36,11 @@ export function Footer() {
             </FooterColumn>
             <FooterColumn title="KONTAK KAMI">
               <a href={CONTACT.whatsapp} target="_blank" rel="noreferrer" className="footer-contact">
-                <ContactIcon src="/images/icon-call.png" />
+                <ContactIcon src="/images/icon-call.webp" />
                 {CONTACT.phone}
               </a>
               <a href={`mailto:${CONTACT.email}`} className="footer-contact">
-                <ContactIcon src="/images/icon-sms.png" />
+                <ContactIcon src="/images/icon-sms.webp" />
                 {CONTACT.email}
               </a>
               <a
@@ -50,7 +50,7 @@ export function Footer() {
                 aria-label={`Instagram ${CONTACT.instagram}`}
                 className="footer-contact"
               >
-                <ContactIcon src="/images/icon-instagram.png" />
+                <ContactIcon src="/images/icon-instagram.webp" />
                 {CONTACT.instagram}
               </a>
               <a

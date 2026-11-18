@@ -62,7 +62,7 @@ export function OrderLookup() {
         </>}
       </div>
       {!busy && !error && orders.length === 0 && <div className="flex flex-1 flex-col items-center justify-center gap-6 px-4 py-16 text-center">
-        <Image src="/images/empty-order.png" alt="" width={92} height={88} className="h-auto w-[80px]" />
+        <Image src="/images/empty-order.svg" alt="" width={94} height={84} className="h-auto w-[80px]" unoptimized priority />
         <div className="flex max-w-md flex-col gap-2"><h1 className="text-2xl font-semibold tracking-tight md:text-[28px]">{searched ? "Pesanan tidak ditemukan" : "Cek pesananmu"}</h1><p className="text-muted-foreground text-sm md:text-base">{searched ? "Periksa kembali nomor invoice atau nomor WhatsApp yang kamu masukkan." : "Masukkan nomor invoice atau nomor WhatsApp untuk melihat status pembayaran pesananmu."}</p></div>
       </div>}
     </section>

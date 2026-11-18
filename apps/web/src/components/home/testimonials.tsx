@@ -4,21 +4,21 @@ import { SectionHeading } from "@/components/layout/section-heading";
 const TESTIMONIALS = [
   {
     name: "Salsabila Putri",
-    avatar: "/images/profile-salsabila.png",
+    avatar: "/images/profile-salsabila.webp",
     campus: "Universitas Negeri Yogyakarta",
     quote:
       "Sejak menggunakan Gleans, saya jadi lebih percaya diri sebelum mengumpulkan tugas. Proses pengecekan dan persiapan tulisan terasa jadi lebih cepat dan saya bisa lebih tenang saat submit tugas.",
   },
   {
     name: "Fahri Maulana",
-    avatar: "/images/profile-fahri.png",
+    avatar: "/images/profile-fahri.webp",
     campus: "Universitas Muhammadiyah Malang",
     quote:
       "Gleans membantu saya dari proses menyusun sampai mengecek tulisan. Simple, cepat, dan sangat membantu terutama saat deadline tugas sudah dekat. Semua yang saya butuhkan ada dalam satu platform.",
   },
   {
     name: "Putra Ramadhan",
-    avatar: "/images/profile-putra.png",
+    avatar: "/images/profile-putra.webp",
     campus: "Universitas Negeri Semarang",
     quote:
       "Gleans membantu saya menyelesaikan kebutuhan penulisan akademik dalam satu tempat. Dari menyusun tulisan sampai mengeceknya sebelum dikumpulkan, semuanya terasa lebih praktis, cepat, dan nggak ribet.",
@@ -43,7 +43,7 @@ function TestimonialCard({
   return (
     <figure className={className} aria-hidden={hidden}>
       <div className="flex flex-col gap-6">
-        <Image src="/images/icon-quote.png" alt="" width={20} height={20} className="size-5" />
+        <Image src="/images/icon-quote.webp" alt="" width={20} height={20} className="size-5" />
         <blockquote className="text-lg leading-relaxed md:text-xl lg:text-2xl lg:leading-[1.5]">{quote}</blockquote>
       </div>
       <figcaption className="flex items-center gap-4">
@@ -59,7 +59,7 @@ function TestimonialCard({
           <p className="text-muted-foreground truncate text-sm md:text-base">{campus}</p>
         </div>
         <span className="flex items-center gap-2 text-lg md:text-xl">
-          <Image src="/images/icon-star.png" alt="" width={20} height={20} className="size-5" />
+          <Image src="/images/icon-star.webp" alt="" width={20} height={20} className="size-5" />
           5.0
         </span>
       </figcaption>

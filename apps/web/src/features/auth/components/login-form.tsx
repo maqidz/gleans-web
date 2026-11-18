@@ -46,7 +46,7 @@ export function LoginForm() {
         <AuthField label="Email" htmlFor="email" error={errors.email?.message}>
           <AuthInput
             id="email"
-            icon="/images/icon-mail.png"
+            icon="mail"
             type="email"
             autoComplete="email"
             placeholder="kamu@gmail.com"
@@ -56,7 +56,6 @@ export function LoginForm() {
         <AuthField label="Kata Sandi" htmlFor="password" error={errors.password?.message}>
           <PasswordInput
             id="password"
-            icon="/images/icon-lock.png"
             autoComplete="current-password"
             placeholder="Masukkan Kata Sandi"
             {...register("password")}

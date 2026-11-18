@@ -49,12 +49,12 @@ export function RegisterForm() {
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
         <div className="grid gap-4 sm:grid-cols-2">
           <AuthField label="Nama Lengkap" htmlFor="name" error={errors.name?.message}>
-            <AuthInput id="name" icon="/images/icon-user.png" autoComplete="name" placeholder="Nama Lengkap" {...register("name")} />
+            <AuthInput id="name" icon="user" autoComplete="name" placeholder="Nama Lengkap" {...register("name")} />
           </AuthField>
           <AuthField label="Email" htmlFor="email" error={errors.email?.message}>
             <AuthInput
               id="email"
-              icon="/images/icon-mail.png"
+              icon="mail"
               type="email"
               autoComplete="email"
               placeholder="kamu@gmail.com"
@@ -65,7 +65,6 @@ export function RegisterForm() {
         <AuthField label="Kata Sandi" htmlFor="password">
           <PasswordInput
             id="password"
-            icon="/images/icon-lock.png"
             autoComplete="new-password"
             placeholder="Masukkan Kata Sandi"
             aria-invalid={Boolean(errors.password)}

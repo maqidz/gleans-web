@@ -132,7 +132,6 @@ export function DashboardBilling() {
   return (
     <>
       <Heading title="Paket & Saldo" description="Isi saldo atau beli kuota pemeriksaan Gleans Shield." />
-      <p className="mb-5 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">Duitku Sandbox. Saldo dan kuota di halaman ini hanya untuk pengujian.</p>
       {loadError && <div className="mb-5 flex flex-wrap items-center gap-3" role="alert"><span className="text-sm text-destructive">{loadError}</span><Button size="pill-sm" variant="outline" onClick={() => void refresh()}>Muat ulang</Button></div>}
       <div className="grid gap-4 md:grid-cols-2">
         <Panel className="border bg-white">
@@ -142,7 +141,7 @@ export function DashboardBilling() {
         </Panel>
         <Panel className="border bg-white">
           <div className="flex items-center gap-2 text-sm text-muted-foreground"><Layers aria-hidden="true" className="size-5" />TOTAL KUOTA</div>
-          <p className="mt-4 text-2xl font-semibold">{snapshot ? `${snapshot.quota} pemeriksaan` : "—"}</p>
+          <p className="mt-4 text-2xl font-semibold">{snapshot ? snapshot.quota : "—"}</p>
         </Panel>
       </div>
       <section className="mt-8">

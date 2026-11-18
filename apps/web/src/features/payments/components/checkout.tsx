@@ -1,11 +1,11 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
-import { Check, Info, Loader2, RotateCcw } from "lucide-react";
+import { Check, Loader2, RotateCcw } from "lucide-react";
 import { Button } from "@gleans/ui/button";
-import { PageIntro } from "@/components/layout/section-heading";
 import { PRODUCTS } from "@/config/site";
 import { formatRupiah } from "@/lib/format";
 import type { PaymentOrder } from "../types";
@@ -137,13 +137,13 @@ export function PaymentCheckout() {
   return (
     <PaymentLayout
       title={wallet ? "Pembayaran Gleans Shield" : undefined}
-      wallet={wallet}
+      total={summary ? method === "quota" ? "1 kuota Shield" : formatRupiah(summary.amount) : undefined}
       panelTitle={order?.status === "paid" ? "Hasil pemeriksaan" : wallet ? "Pembayaran" : "Kode QRIS"}
       summary={<>
         {summary && (
-          <section aria-labelledby="order-summary-title" className="border-t pt-6">
-            <h2 id="order-summary-title" className="text-lg font-semibold">Ringkasan Pesanan</h2>
-            <dl className="mt-5 space-y-3.5 text-sm">
+          <section aria-labelledby="order-summary-title">
+            <h2 id="order-summary-title" className="text-sm font-semibold">Ringkasan Pesanan</h2>
+            <dl className="mt-3 space-y-2.5 text-xs sm:text-[13px]">
               <SummaryRow label="Dokumen">{summary.document_name}</SummaryRow>
               <SummaryRow label="Nomor Invoice">{order?.id ?? "—"}</SummaryRow>
               <SummaryRow label="Status">
@@ -152,15 +152,11 @@ export function PaymentCheckout() {
               {order?.expires_at && (
                 <SummaryRow label="Batas pembayaran">{new Date(order.expires_at).toLocaleString("id-ID")}</SummaryRow>
               )}
-              <div className="flex items-center justify-between gap-4 border-t pt-4">
-                <dt className="font-medium">Total pembayaran</dt>
-                <dd className="text-2xl font-semibold tracking-tight tabular-nums">{method === "quota" ? "1 kuota Shield" : formatRupiah(summary.amount)}</dd>
-              </div>
             </dl>
           </section>
         )}
         {!id && !requestId && <p className="text-sm text-muted-foreground">Buat pesanan terlebih dahulu untuk melanjutkan pembayaran.</p>}
-        <Link href={order ? "/cek-pesanan" : "/deteksi-ai"} className="w-fit text-sm font-medium text-primary hover:underline">
+        <Link href={order ? "/cek-pesanan" : "/deteksi-ai"} className="self-center text-xs font-medium text-primary hover:underline">
           {order ? "Lihat pesanan saya" : "Buat pesanan"}
         </Link>
       </>}
@@ -173,12 +169,12 @@ export function PaymentCheckout() {
         </p>
       )}
       {(qrCode || waitingForQr) && (
-        <div className="mx-auto w-full max-w-[266px] rounded-2xl border bg-white p-2">
+        <div className="mx-auto w-full max-w-[218px] rounded-2xl border bg-white p-2">
           <div className="grid aspect-square place-items-center">
             {qrCode ? (
               <QRCodeSVG
                 value={qrCode}
-                size={248}
+                size={200}
                 marginSize={4}
                 level="M"
                 title="QRIS pembayaran Sandbox Duitku"
@@ -204,7 +200,7 @@ export function PaymentCheckout() {
           </p>
           <p className="font-medium">{order.fulfillment_status === "completed" ? "Pemeriksaan selesai" : order.fulfillment_status === "processing" ? "Dokumen sedang diperiksa" : order.fulfillment_status === "failed" ? "Pemeriksaan perlu ditinjau" : "Menunggu pemeriksaan"}</p>
           {order.report_expires_at && <p className="text-xs text-muted-foreground">Batas unduh: {new Date(order.report_expires_at).toLocaleString("id-ID")}</p>}
-          {order.can_download && <Button asChild size="pill" className="w-full"><a href={`/api/payments/orders/${encodeURIComponent(order.id)}/report`}>Unduh hasil PDF</a></Button>}
+          {order.can_download && <Button asChild size="pill-sm" className="w-full"><a href={`/api/payments/orders/${encodeURIComponent(order.id)}/report`}>Unduh hasil PDF</a></Button>}
           {order.fulfillment_status === "completed" && order.report_expires_at && Date.parse(order.report_expires_at) <= Date.now() && <p className="text-xs text-destructive">Masa unduh 24 jam telah berakhir.</p>}
           {order.access_code ? (
             <Button variant="outline" size="pill-sm" onClick={() => void copyAccess()}>Salin tautan akses</Button>
@@ -215,15 +211,15 @@ export function PaymentCheckout() {
               <Button size="pill-sm" variant="outline" disabled={busy || !recoveryCode.trim()} onClick={() => void restoreAccess()}>Buka akses unduh</Button>
             </div>
           )}
-          {order.fulfillment_status !== "completed" && <Button variant="outline" size="pill" className="w-full" onClick={() => void load()}>Perbarui status pemeriksaan</Button>}
+          {order.fulfillment_status !== "completed" && <Button variant="outline" size="pill-sm" className="w-full" onClick={() => void load()}>Perbarui status pemeriksaan</Button>}
         </div>
       )}
-      {order?.status === "draft" && !busy && <Button size="pill" className="w-full" onClick={() => void act("pay")}>Tampilkan QRIS</Button>}
+      {order?.status === "draft" && !busy && <Button size="pill-sm" className="w-full" onClick={() => void act("pay")}>Tampilkan QRIS</Button>}
       {order?.status === "pending" && order.payment_url && (
-        <Button asChild size="pill" className="w-full"><a href={order.payment_url} target="_blank" rel="noopener noreferrer">Buka Halaman QRIS Duitku</a></Button>
+        <Button asChild size="pill-sm" className="w-full"><a href={order.payment_url} target="_blank" rel="noopener noreferrer">Buka Halaman QRIS Duitku</a></Button>
       )}
       {(order?.status === "pending" || order?.status === "creating") && (
-        <Button variant="outline" size="pill" className="w-full" disabled={busy || cooldown > 0} onClick={() => void act("check")}>
+        <Button variant="outline" size="pill-sm" className="w-full" disabled={busy || cooldown > 0} onClick={() => void act("check")}>
           <RotateCcw aria-hidden="true" className={busy ? "motion-safe:animate-spin" : ""} />
           {cooldown ? `Periksa lagi dalam ${cooldown} detik` : "Periksa Status Pembayaran"}
         </Button>
@@ -244,7 +240,7 @@ export function PaymentCheckout() {
 
 function SummaryRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[minmax(8rem,0.85fr)_minmax(0,1.15fr)] gap-3">
+    <div className="grid grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] gap-3">
       <dt className="text-muted-foreground">{label}</dt>
       <dd className="min-w-0 text-right font-medium [overflow-wrap:anywhere]">{children}</dd>
     </div>
@@ -254,30 +250,39 @@ function SummaryRow({ label, children }: { label: string; children: React.ReactN
 export function PaymentLayout({
   summary,
   title = "Pembayaran QRIS",
-  wallet = false,
+  total,
   panelTitle = "Kode QRIS",
   children,
 }: {
   summary?: React.ReactNode;
   title?: string;
-  wallet?: boolean;
+  total?: React.ReactNode;
   panelTitle?: string;
   children?: React.ReactNode;
 }) {
   return (
-    <div className="container-page grid items-start gap-8 py-8 sm:py-12 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:gap-16 lg:py-[60px]">
-      <div className="flex min-w-0 flex-col gap-6 sm:gap-8">
-        <PageIntro title={title} badge={{ icon: PRODUCTS[0].icon, label: PRODUCTS[0].tag }} />
-        {summary}
+    <div className="container-page flex justify-center py-6 sm:py-8">
+      <div className="w-full min-w-0 max-w-[460px] overflow-hidden rounded-[24px] border bg-background">
+        <header className="flex flex-col items-center px-5 py-5 text-center sm:px-6">
+          <p className="flex items-center gap-2 text-xs font-medium tracking-wide text-primary">
+            <Image src={PRODUCTS[0].icon} alt="" width={16} height={16} className="size-4" />
+            {PRODUCTS[0].tag}
+          </p>
+          <h1 className="mt-2 text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
+          {total && <div className="mt-3">
+            <p className="text-xs text-muted-foreground">Total pembayaran</p>
+            <p className="mt-1 text-[28px] leading-tight font-semibold tracking-tight tabular-nums">{total}</p>
+          </div>}
+        </header>
+        <section aria-labelledby="qris-panel-title" className="flex min-w-0 flex-col gap-3 border-t bg-surface/60 px-5 py-4 sm:px-6">
+          <h2 id="qris-panel-title" className="text-center text-sm font-medium">{panelTitle}</h2>
+          {children ?? <div className="mx-auto grid aspect-square w-full max-w-[218px] place-items-center rounded-2xl border bg-white" role="status">
+            <Loader2 aria-hidden="true" className="size-8 text-primary motion-safe:animate-spin" />
+            <span className="sr-only">Memuat pembayaran</span>
+          </div>}
+        </section>
+        {summary && <div className="flex min-w-0 flex-col gap-4 border-t px-5 py-4 sm:px-6">{summary}</div>}
       </div>
-      <section aria-labelledby="qris-panel-title" className="flex min-w-0 flex-col gap-4 rounded-[24px] border bg-surface p-5 sm:p-6 lg:p-8">
-        <h2 id="qris-panel-title" className="text-lg font-semibold sm:text-xl">{panelTitle}</h2>
-        <p className="flex items-start gap-2 text-sm text-muted-foreground">
-          <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-          {wallet ? "Saldo dan kuota Sandbox hanya untuk pengujian." : "Duitku Sandbox. Pembayaran hanya simulasi."}
-        </p>
-        {children}
-      </section>
     </div>
   );
 }

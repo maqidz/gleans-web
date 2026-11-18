@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { ChevronDown, Copy, ImageIcon, RotateCcw, Trash2, Upload } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@gleans/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@gleans/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@gleans/ui/tabs";
 import type { AdminMedia } from "../lib/media";
 import { editorRequest, uploadEditorMedia } from "../lib/editor-client";
@@ -46,17 +47,45 @@ export function AdminSettings() {
 function ActivityList() {
   const [items, setItems] = useState<Activity[] | null>(null);
   const [error, setError] = useState("");
+  const [deleteThrough, setDeleteThrough] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
   useEffect(() => {
     const controller = new AbortController();
     void editorRequest<{ activity: Activity[] }>("/api/admin/site-editor?kind=activity", { signal: controller.signal })
-      .then(data => setItems(data.activity))
+      .then(data => { if (!controller.signal.aborted) setItems(data.activity); })
       .catch(error => { if (!controller.signal.aborted) setError(error.message); });
     return () => controller.abort();
   }, []);
+
+  async function clearHistory() {
+    if (deleteThrough == null || busy) return;
+    setBusy(true);
+    setDeleteError("");
+    try {
+      const { deletedThrough } = await editorRequest<{ deletedThrough: number }>(`/api/admin/activity?through=${deleteThrough}`, { method: "DELETE" });
+      setItems(current => current?.filter(item => item.id > deletedThrough) ?? null);
+      setDeleteThrough(null);
+      setNotice("Riwayat aktivitas berhasil dihapus.");
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Riwayat aktivitas belum dapat dihapus.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>;
   if (!items) return <p role="status" className="text-sm text-muted-foreground">Memuat aktivitas…</p>;
   return <section className="min-w-0">
-    <p className="mb-5 text-sm text-muted-foreground">{items.length} aktivitas terakhir</p>
+    <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <p className="text-sm text-muted-foreground">{items.length} aktivitas terakhir</p>
+      <Button type="button" variant="outline" size="pill-sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+        disabled={!items.length || busy} onClick={() => { setDeleteError(""); setNotice(""); setDeleteThrough(Math.max(...items.map(item => item.id))); }}>
+        <Trash2 aria-hidden="true" />Hapus riwayat
+      </Button>
+    </div>
+    {notice && <p role="status" className="mb-4 text-sm text-primary">{notice}</p>}
     <div role="region" aria-label="Tabel aktivitas" tabIndex={0} className="overflow-x-auto rounded-2xl border focus-visible:ring-2 focus-visible:ring-primary">
       <table className="w-full min-w-[650px] text-left text-sm">
         <thead className="bg-surface text-xs text-muted-foreground"><tr>{["Waktu", "Pelaku", "Tindakan", "Objek"].map(label => <th key={label} scope="col" className="px-4 py-4 font-medium uppercase">{label}</th>)}</tr></thead>
@@ -66,6 +95,19 @@ function ActivityList() {
         </tr>)}{!items.length && <tr><td colSpan={4} className="px-4 py-12 text-center text-muted-foreground">Belum ada aktivitas.</td></tr>}</tbody>
       </table>
     </div>
+    <Dialog open={deleteThrough != null} onOpenChange={open => { if (!open && !busy) setDeleteThrough(null); }}>
+      <DialogContent className="rounded-[24px] p-5 sm:p-6">
+        <DialogHeader className="pr-6">
+          <DialogTitle>Hapus riwayat aktivitas?</DialogTitle>
+          <DialogDescription>Riwayat aktivitas admin akan dihapus permanen dan tidak dapat dipulihkan. Artikel, promosi, dan media tetap tersimpan.</DialogDescription>
+        </DialogHeader>
+        {deleteError && <p role="alert" className="text-sm text-destructive">{deleteError}</p>}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" size="pill-sm" disabled={busy} onClick={() => setDeleteThrough(null)}>Batal</Button>
+          <Button type="button" variant="destructive" size="pill-sm" disabled={busy} onClick={() => void clearHistory()}>{busy ? "Menghapus…" : "Hapus riwayat"}</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   </section>;
 }
 

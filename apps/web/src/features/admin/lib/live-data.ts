@@ -8,7 +8,7 @@ export type AdminOrderRow = {
 };
 export function emptyAdminState(): AdminState {
   return { demoVersion: 0, admins: [], customers: [], orders: [], plans: [], blogs: [], promos: [], transactions: [], activity: [],
-    settings: { email: "team@gleans.my.id", whatsapp: "6281998096254", maxMb: 25, minWords: 1, maxWords: 25000, shieldPrice: 10000, shield: true, cite: true, file: true } };
+    settings: { email: "team@gleans.my.id", whatsapp: "6281995473482", maxMb: 25, minWords: 1, maxWords: 25000, shieldPrice: 10000, shield: true, cite: true, file: true } };
 }
 export function mapAdminOrders(rows: AdminOrderRow[]): AdminState {
   const state = emptyAdminState();

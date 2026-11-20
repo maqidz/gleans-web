@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { TikTokIcon } from "@/components/brand/icons";
+import { TikTokIcon, WhatsAppIcon } from "@/components/brand/icons";
 import { Logo } from "@/components/brand/logo";
 import { CONTACT, PRICING_LINK } from "@/config/site";
 
@@ -35,8 +35,8 @@ export function Footer() {
               ))}
             </FooterColumn>
             <FooterColumn title="KONTAK KAMI">
-              <a href={CONTACT.whatsapp} target="_blank" rel="noreferrer" className="footer-contact">
-                <ContactIcon src="/images/icon-call.webp" />
+              <a href={CONTACT.whatsapp} target="_blank" rel="noreferrer" aria-label={`WhatsApp ${CONTACT.phone}`} className="footer-contact">
+                <WhatsAppIcon className="size-5 shrink-0" />
                 {CONTACT.phone}
               </a>
               <a href={`mailto:${CONTACT.email}`} className="footer-contact">

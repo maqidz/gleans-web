@@ -77,7 +77,7 @@ export function AdminCustomers() {
     <div className="mb-7 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
       {metrics.map(([label, value]) => <section key={label} className={card}>
         <p className="text-xs uppercase text-muted-foreground">{label}</p>
-        <p className="mt-4 break-words text-2xl font-semibold">{directory ? value : "—"}</p>
+        <p className="mt-4 break-words text-2xl font-semibold">{value}</p>
       </section>)}
     </div>
 
@@ -91,12 +91,12 @@ export function AdminCustomers() {
         </div>
       </div>
       <div className="mb-3 flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
-        <p role="status">{error || (directory ? `${results.length} pelanggan ditemukan` : "Memuat pelanggan…")}</p>
+        <p role="status">{error || (directory ? `${results.length} pelanggan ditemukan` : "0 pelanggan ditemukan")}</p>
         {error && <button type="button" className="text-primary underline underline-offset-4" onClick={() => { setError(""); setRefreshCount(count => count + 1); }}>Coba lagi</button>}
         {directory?.limited && <p>Berdasarkan 500 pesanan akun terbaru.</p>}
       </div>
       <div className="overflow-hidden rounded-2xl border">
-        <div className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-ring" role="region" aria-label="Tabel pelanggan" tabIndex={0}>
+        <div className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-ring" role="region" aria-label="Tabel pelanggan" aria-busy={!directory && !error} tabIndex={0}>
           <table className="w-full min-w-[680px] text-left text-sm">
             <thead className="bg-surface text-xs uppercase text-muted-foreground">
               <tr>{columns.map(label => <th key={label} scope="col" className={label === "Aksi" ? "sticky right-0 w-px border-l bg-surface px-4 py-4 font-medium" : "whitespace-nowrap px-4 py-4 font-medium"}>{label}</th>)}</tr>

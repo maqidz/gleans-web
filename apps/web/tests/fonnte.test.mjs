@@ -247,9 +247,12 @@ test('scheduled endpoint rejects missing/wrong credentials without dispatching',
 test('report confirmation requires a real 0–100 score before freezing or completing the report', async () => {
   let frozen = 0;
   let updates = [];
+  let dispatched = 0;
+  const deferred = [];
   const ticket = { id: '550e8400-e29b-41d4-a716-446655440000', purpose: 'report', guest_hash: 'guest', order_id: 'GLS-test', expires_at: '2099-01-01', final_key: 'report.pdf', document_url: 'https://example.test/report.pdf', document_name: 'report.pdf' };
   const query = { update: values => { updates.push(values); return query; }, eq: () => query, neq: () => Promise.resolve({ error: null }) };
   globalThis.__reportScore = {
+    after: callback => deferred.push(callback), dispatchReportNotifications: async () => { dispatched++; },
     currentAdmin: async () => ({ email: 'admin@example.test' }), guestSession: async () => ({ hash: 'guest' }),
     findUpload: async () => ticket, freezeUpload: async () => { frozen++; },
     findOrder: async () => ({ id: 'GLS-test', status: 'paid', fulfillment_status: 'processing' }),
@@ -258,9 +261,9 @@ test('report confirmation requires a real 0–100 score before freezing or compl
   const { POST } = await import(await moduleUrl('src/app/api/payments/uploads/[id]/route.ts', {
     '"zod"': JSON.stringify(pathToFileURL(require.resolve('zod')).href),
     'import { currentAdmin } from "@/features/auth/session";': 'const { currentAdmin } = globalThis.__reportScore;',
-    'import { after } from "next/server";': 'const after = () => {};',
-    'import { dispatchReportNotifications } from "@/features/whatsapp/server/dispatch";': 'const dispatchReportNotifications = async () => {};',
-    'import { fonnteConfigured } from "@/features/whatsapp/server/fonnte";': 'const fonnteConfigured = () => false;',
+    'import { after } from "next/server";': 'const {after} = globalThis.__reportScore;',
+    'import { dispatchReportNotifications } from "@/features/whatsapp/server/dispatch";': 'const {dispatchReportNotifications} = globalThis.__reportScore;',
+    'import { fonnteConfigured } from "@/features/whatsapp/server/fonnte";': 'const fonnteConfigured = () => true;',
     'import { guestSession } from "@/features/payments/server/guest";': 'const { guestSession } = globalThis.__reportScore;',
     'import { findUpload, freezeUpload } from "@/features/payments/server/uploads";': 'const { findUpload, freezeUpload } = globalThis.__reportScore;',
     'import { findOrder, paymentAdmin } from "@/features/payments/server/repository";': 'const { findOrder, paymentAdmin } = globalThis.__reportScore;',
@@ -272,11 +275,16 @@ test('report confirmation requires a real 0–100 score before freezing or compl
     for (const value of [{}, { aiScore: '35' }, { aiScore: -1 }, { aiScore: 101 }, { aiScore: 1.234 }, { aiScore: null }]) {
       assert.equal((await POST(request(value), context)).status, 400);
     }
-    assert.equal(frozen, 0); assert.equal(updates.length, 0);
+    assert.equal(frozen, 0); assert.equal(updates.length, 0); assert.equal(deferred.length,0);
     for (const score of [0, 35.25, 100]) {
       assert.equal((await POST(request({ aiScore: score }), context)).status, 200);
       assert.equal(updates.at(-1).ai_score, score);
       assert.equal(updates.at(-1).fulfillment_status, 'completed');
+      assert.equal(updates.at(-1).report_key,ticket.final_key);
+      assert.equal(Date.parse(updates.at(-1).report_expires_at)-Date.parse(updates.at(-1).completed_at),86400000);
     }
+    assert.equal(dispatched,0);assert.equal(deferred.length,3);
+    for(const callback of deferred)await callback();
+    assert.equal(dispatched,3);
   } finally { delete globalThis.__reportScore; }
 });

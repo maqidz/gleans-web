@@ -5,11 +5,32 @@ import { MEDIA_BUCKET, setEditorMediaVisibility } from "@/features/admin/lib/sit
 import { EDITOR_IMAGE_LIMIT } from "@/features/admin/lib/media";
 import { json, sameOrigin } from "@/features/payments/server/http";
 import { paymentAdmin } from "@/features/payments/server/repository";
+import { purgeEditorMedia } from "@/features/admin/lib/media-purge";
+
+export const maxDuration = 60;
 
 const visibility = z.object({
   id: z.string().min(1).max(80).regex(/^[a-zA-Z0-9-]+$/),
   hidden: z.boolean(),
 }).strict();
+
+const deletion = z.object({ ids: z.array(visibility.shape.id).min(1).max(203) }).strict();
+
+export async function DELETE(request: Request) {
+  if (!sameOrigin(request)) return json({ error: "Permintaan tidak diizinkan." }, 403);
+  try {
+    const admin = await currentAdmin();
+    if (!admin) return json({ error: "Akses ditolak." }, 403);
+    const raw = await request.text();
+    if (raw.length > 20000) return json({ error: "Pilihan media terlalu banyak." }, 413);
+    const parsed = deletion.safeParse(JSON.parse(raw));
+    if (!parsed.success) return json({ error: "Pilihan media tidak valid." }, 400);
+    return json(await purgeEditorMedia([...new Set(parsed.data.ids)], admin.email));
+  } catch (error) {
+    if (error instanceof SyntaxError) return json({ error: "Pilihan media tidak valid." }, 400);
+    return json({ error: "Media belum dapat dihapus permanen. Coba lagi." }, 503);
+  }
+}
 
 export async function PATCH(request: Request) {
   if (!sameOrigin(request)) return json({ error: "Permintaan tidak diizinkan." }, 403);
@@ -41,10 +62,10 @@ export async function POST(request: Request) {
   try {
     const admin = await currentAdmin();
     if (!admin) return json({ error: "Akses ditolak." }, 403);
-    if (Number(request.headers.get("content-length")) > EDITOR_IMAGE_LIMIT + 16_384) return json({ error: "Ukuran gambar maksimal 4 MB." }, 413);
+    if (Number(request.headers.get("content-length")) > EDITOR_IMAGE_LIMIT + 16_384) return json({ error: "Ukuran gambar maksimal 2 MB." }, 413);
     const file = (await request.formData()).get("file");
     if (!(file instanceof File) || !file.size) return json({ error: "Pilih gambar terlebih dahulu." }, 400);
-    if (file.size > EDITOR_IMAGE_LIMIT) return json({ error: "Ukuran gambar maksimal 4 MB." }, 413);
+    if (file.size > EDITOR_IMAGE_LIMIT) return json({ error: "Ukuran gambar maksimal 2 MB." }, 413);
     const type = imageType(Buffer.from(await file.slice(0, 12).arrayBuffer()));
     if (!type) return json({ error: "Gunakan gambar PNG, JPG, WebP, atau GIF." }, 400);
 

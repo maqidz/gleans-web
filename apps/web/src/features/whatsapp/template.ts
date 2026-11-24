@@ -54,9 +54,9 @@ export function renderReportTemplate(template: string, values: TemplateValues) {
 }
 
 export const PREVIEW_VALUES: TemplateValues = {
-  nama: "Alya Putri", invoice: "GLS-A1B2C3D4E5F6", dokumen: "Skripsi - Bab 1.pdf", nama_file: "Skripsi - Bab 1.pdf", skor_ai: "35",
-  link_hasil: "https://www.gleans.my.id/cek-pesanan/GLS-A1B2C3D4E5F6", diskon: "50", kode_promo: "HEMAT5RIBU", masa_berlaku: "sampai 31 Desember 2027",
-  tautan_hasil: "https://www.gleans.my.id/cek-pesanan/GLS-A1B2C3D4E5F6", batas_unduh: "25 November 2026 pukul 10.00 WIB",
+  nama: "Alya Putri", invoice: "GLS-A1B2C3D4", dokumen: "Skripsi - Bab 1.pdf", nama_file: "Skripsi - Bab 1.pdf", skor_ai: "35",
+  link_hasil: "https://www.gleans.my.id/cek-pesanan/GLS-A1B2C3D4", diskon: "50", kode_promo: "HEMAT5RIBU", masa_berlaku: "sampai 31 Desember 2027",
+  tautan_hasil: "https://www.gleans.my.id/cek-pesanan/GLS-A1B2C3D4", batas_unduh: "25 November 2026 pukul 10.00 WIB",
 };
 
 export type WhatsAppTemplateSettings = { template: string; revision: number; promoId: string | null; activeTemplateId: string; enabled: boolean };

@@ -42,6 +42,7 @@ test('all demo invoices use twelve hex characters and old short links still reso
  assert.equal(normalizeAdminOrderId('SH-1002'),next.orders[1].id);
  assert.equal(normalizeAdminOrderId('GLS-1002'),next.orders[1].id);
  assert.equal(normalizeAdminOrderId('GLS-E23E68C14649'),'GLS-E23E68C14649');
+ assert.equal(normalizeAdminOrderId('GLS-e23e68c1'),'GLS-E23E68C1');
  assert.deepEqual(upgradeAdminDemo(next),next);
 });
 test('wallet adjustments require a reason and preserve unrelated records',()=>{
@@ -84,11 +85,12 @@ test('demo invitations validate roles, reject duplicate emails, and log activity
  assert.throws(()=>inviteDemoAdmin(state,{...member,role:'Owner'}));assert.equal(state.admins.length,1);
 });
 
-test('media rejects unsupported formats, empty files, and files above 10 MB',()=>{
+test('media rejects unsupported formats, empty files, and files above 2 MB',()=>{
  assert.doesNotThrow(()=>validateMedia(new File(['image'],'sample.png',{type:'image/png'})));
  assert.throws(()=>validateMedia(new File(['<svg/>'],'sample.svg',{type:'image/svg+xml'})),/PNG/);
- assert.throws(()=>validateMedia(new File([],'empty.png',{type:'image/png'})),/10 MB/);
- assert.throws(()=>validateMedia(new File([new Uint8Array(10*1024*1024+1)],'large.jpg',{type:'image/jpeg'})),/10 MB/);
+ assert.throws(()=>validateMedia(new File([],'empty.png',{type:'image/png'})),/2 MB/);
+ assert.throws(()=>validateMedia(new File([new Uint8Array(2*1024*1024+1)],'large.jpg',{type:'image/jpeg'})),/2 MB/);
+ assert.doesNotThrow(()=>validateMedia(new File([new Uint8Array(2*1024*1024)],'limit.jpg',{type:'image/jpeg'})));
 });
 
 test('Shield download expires exactly 24 hours after completion',()=>{

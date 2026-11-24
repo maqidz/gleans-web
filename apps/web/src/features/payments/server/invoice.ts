@@ -2,7 +2,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 
 export function invoiceNumber(): string {
-  return `GLS-${randomBytes(6).toString("hex").toUpperCase()}`;
+  return `GLS-${randomBytes(4).toString("hex").toUpperCase()}`;
 }
 
 // The primary key is the final uniqueness check, including concurrent reservations.

@@ -1,5 +1,12 @@
 import type { AdminState } from "./model";
 
+export function adminReportStatus(order: { status: string; fulfillment_status: string; report_expires_at?: string | null }, now = Date.now()) {
+  if (order.status !== "paid" || order.fulfillment_status !== "completed") return "Belum tersedia";
+  const expires = Date.parse(order.report_expires_at ?? "");
+  if (!Number.isFinite(expires)) return "Belum tersedia";
+  return expires <= now ? "Kedaluwarsa" : "Siap diunduh";
+}
+
 export type AdminOrderRow = {
   id: string; owner_id: string | null; customer_name: string; whatsapp: string;
   email?: string | null;

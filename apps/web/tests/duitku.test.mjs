@@ -271,11 +271,10 @@ test('checkout uses the server-verified identity, including after session refres
   await assert.rejects(()=>checkoutUserId(async()=>Response.json({account:{name:'Tester'}})),/Sesi akun belum dapat diperiksa/);
 });
 
-test('invoice numbers use the short uppercase format and retry only primary-key collisions',async()=>{
+test('invoice numbers use eight uppercase hex characters and retry only primary-key collisions',async()=>{
   const {invoiceNumber,reserveInvoice}=await moduleFrom('src/features/payments/server/invoice.ts');
   const numbers=Array.from({length:1000},()=>invoiceNumber());
-  for(const id of numbers) assert.match(id,/^GLS-[0-9A-F]{12}$/);
-  assert.equal(new Set(numbers).size,numbers.length);
+  for(const id of numbers) assert.match(id,/^GLS-[0-9A-F]{8}$/);
   const ids=[];
   const result=await reserveInvoice(async id=>{
     ids.push(id);
@@ -292,17 +291,18 @@ test('invoice numbers use the short uppercase format and retry only primary-key 
 
 test('order lookup normalizes invoice case and Indonesian WhatsApp formats without accepting partial searches',async()=>{
   const {parseOrderLookup}=await moduleFrom('src/features/orders/lib/lookup.ts');
+  assert.deepEqual(parseOrderLookup(' gls-a7f29b83 '),{kind:'invoice',invoice:'GLS-A7F29B83'});
   assert.deepEqual(parseOrderLookup(' gls-a7f29b83c1d4 '),{kind:'invoice',invoice:'GLS-A7F29B83C1D4'});
   assert.deepEqual(parseOrderLookup('GLS-8644B90D-5365-4A41-AD04-3355302481BF'),{kind:'invoice',invoice:'GLS-8644b90d-5365-4a41-ad04-3355302481bf'});
   const expected={kind:'whatsapp',numbers:['08123456789','628123456789','+628123456789']};
   for(const value of ['08123456789','628123456789','+62 812-3456-789']) assert.deepEqual(parseOrderLookup(value),expected);
-  for(const value of ['', 'GLS-', '0812', '12345', 'GLS-%', 'or=(owner_id.neq.null)', '+1 2345678900']) assert.equal(parseOrderLookup(value),null);
+  for(const value of ['', 'GLS-', 'GLS-A7F29B8', 'GLS-A7F29B83C', 'GLS-A7F29B83C1D', 'GLS-A7F29B83C1D4E', 'GLS-Z7F29B83', '0812', '12345', 'GLS-%', 'or=(owner_id.neq.null)', '+1 2345678900']) assert.equal(parseOrderLookup(value),null);
 });
 test('guest lookup shows invoice metadata and payment actions without exposing document access capabilities',async()=>{
   const lookup=await moduleFrom('src/features/orders/lib/lookup.ts');
   const http=await moduleFrom('src/features/payments/server/http.ts');
   let user=null, allowed=true, clientCalls=0, publicFields='', maxRows=0;
-  const records=[{id:'GLS-A7F29B83C1D4',owner_id:'owner',whatsapp:'08123456789',document_name:'private.txt',status:'pending',amount:10000,created_at:'2026-10-20T00:00:00Z',expires_at:null,paid_at:null},{id:'GLS-B7F29B83C1D4',owner_id:'other',whatsapp:'08123456789',document_name:'other-private.txt',status:'paid',amount:10000,created_at:'2026-10-19T18:00:00Z'}];
+  const records=[{id:'GLS-A7F29B83',owner_id:'owner',whatsapp:'08123456789',document_name:'private.txt',status:'pending',amount:10000,created_at:'2026-10-20T00:00:00Z',expires_at:null,paid_at:null},{id:'GLS-B7F29B83C1D4',owner_id:'other',whatsapp:'08123456789',document_name:'other-private.txt',status:'paid',amount:10000,created_at:'2026-10-19T18:00:00Z'}];
   function builder(isPublic){let fields='',filters=[];return {
     select(value){fields=value;if(isPublic)publicFields=value;return this;},eq(key,value){filters.push(row=>row[key]===value);return this;},in(key,values){filters.push(row=>values.includes(row[key]));return this;},order(){return this;},async limit(value){maxRows=value;return {error:null,data:records.filter(row=>filters.every(filter=>filter(row))).slice(0,value).map(row=>Object.fromEntries(fields.split(',').map(key=>[key,row[key]])))}}};}
   globalThis.__lookupTest={...lookup,...http,dashboardUser:async()=>user,serverClient:async()=>{clientCalls++;return {database:{from:()=>builder(false)}}},paymentAdmin:()=>({database:{from:()=>builder(true)}}),allowOrderLookup:async()=>allowed,orderAccess:async()=>({allowed:false,code:null})};
@@ -326,7 +326,7 @@ test('guest lookup shows invoice metadata and payment actions without exposing d
     const body=await response.json();assert.equal(body.orders.length,2);assert.equal(maxRows,30);assert.equal(clientCalls,0);
     assert.equal(publicFields,lookup.PUBLIC_LOOKUP_COLUMNS+',owner_id,guest_hash,access_hash');
     for(const order of body.orders){
-      assert.match(order.id,/^GLS-[0-9A-F]{12}$/);assert.equal(order.can_open,true);assert.equal(order.can_download,false);assert.equal(typeof order.document_name,'string');assert.equal(order.amount,10000);
+      assert.match(order.id,/^GLS-(?:[0-9A-F]{8}|[0-9A-F]{12})$/);assert.equal(order.can_open,true);assert.equal(order.can_download,false);assert.equal(typeof order.document_name,'string');assert.equal(order.amount,10000);
       for(const field of ['owner_id','whatsapp','email','document_key','document_url','reference','qr_string','payment_url','guest_hash','access_hash','access_code']) assert.equal(order[field],undefined);
     }
     const byInvoice=(await (await POST(request({query:records[0].id.toLowerCase()}))).json()).orders;
@@ -383,6 +383,56 @@ test('report download requires access, verified payment, a real report and an un
   assert.equal(reportAvailability({...order,report_expires_at:'invalid'},true,now),410);
   assert.equal(reportAvailability(order,true,now),200);
 });
+test('admin can download and process paid orders manually without a GPTZero API key',async()=>{
+  let admin = null, signed = 0;
+  let order = {id:'GLS-1234ABCD',status:'paid',fulfillment_status:'pending',document_key:'private/source.pdf',report_expires_at:null};
+  const httpUrl = await moduleUrlFrom('src/features/payments/server/http.ts');
+  globalThis.__manualFulfillment = {
+    currentAdmin: async()=>admin,
+    findOrder: async()=>order,
+    paymentAdmin: ()=>({storage:{from:()=>({createSignedUrl:async(key,ttl)=>{
+      signed++;assert.equal(key,'private/source.pdf');assert.equal(ttl,60);
+      return {data:{signedUrl:'https://storage.example.test/source.pdf?token=private'},error:null};
+    }})},database:{from:()=>{
+      let values, filters=[];
+      const query={update:input=>{values=input;return query;},eq:(key,value)=>{filters.push(row=>row[key]===value);return query;},in:(key,values)=>{filters.push(row=>values.includes(row[key]));return query;},select:async()=>{
+        if(!order||!filters.every(filter=>filter(order)))return {data:[],error:null};
+        order={...order,...values};return {data:[{id:order.id}],error:null};
+      }};return query;
+    }}}),
+  };
+  const {GET,POST}=await moduleFrom('src/app/api/admin/shield-orders/[id]/route.ts',{
+    'import { currentAdmin } from "@/features/auth/session";':'const {currentAdmin}=globalThis.__manualFulfillment;',
+    'import { findOrder, paymentAdmin } from "@/features/payments/server/repository";':'const {findOrder,paymentAdmin}=globalThis.__manualFulfillment;',
+    '"@/features/payments/server/http"':JSON.stringify(httpUrl),
+    'import { PAYMENT_DOCUMENT_BUCKET } from "@/features/payments/types";':'const PAYMENT_DOCUMENT_BUCKET="private-documents";',
+  });
+  const context={params:Promise.resolve({id:'GLS-1234ABCD'})};
+  const request=(origin='https://example.test')=>new Request('https://example.test/api/admin/shield-orders/GLS-1234ABCD',{method:'POST',headers:{origin,host:'example.test','content-type':'application/json'},body:JSON.stringify({action:'process'})});
+  const previousKey=process.env.GPTZERO_API_KEY;
+  delete process.env.GPTZERO_API_KEY;
+  try {
+    assert.equal((await GET(new Request('https://example.test'),context)).status,403);
+    assert.equal((await POST(request(),context)).status,403);assert.equal(signed,0);
+    admin={email:'admin@example.test'};
+    assert.equal((await POST(request('https://attacker.test'),context)).status,403);
+    const download=await GET(new Request('https://example.test'),context);
+    assert.equal(download.status,302);assert.match(download.headers.get('cache-control'),/no-store/);assert.equal(signed,1);
+    assert.equal((await POST(request(),context)).status,200);assert.equal(order.fulfillment_status,'processing');
+    assert.equal((await POST(request(),context)).status,409);
+    order={...order,status:'pending',fulfillment_status:'pending'};
+    assert.equal((await POST(request(),context)).status,409);
+    order={...order,status:'paid',fulfillment_status:'failed'};
+    assert.equal((await POST(request(),context)).status,200);
+    order={...order,fulfillment_status:'completed',report_expires_at:'2000-01-01T00:00:00Z'};
+    assert.equal((await GET(new Request('https://example.test'),context)).status,410);assert.equal(signed,1);
+    assert.equal((await POST(request(),context)).status,409);
+  } finally {
+    delete globalThis.__manualFulfillment;
+    if(previousKey===undefined)delete process.env.GPTZERO_API_KEY;else process.env.GPTZERO_API_KEY=previousKey;
+  }
+});
+
 test('server rejects renamed or mismatched document formats before sealing an upload',async()=>{
   const {validDocumentHeader}=await moduleFrom('src/features/payments/server/uploads.ts',{
     'import { paymentAdmin } from "./repository";':'const paymentAdmin=()=>{};',

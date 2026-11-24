@@ -74,7 +74,7 @@ export function inviteDemoAdmin(state:AdminState,member:{name:string;email:strin
 
 export function normalizeAdminOrderId(id: string): string {
   return id.replace(/^(?:SH|DEMO|GLS)-([^:]+)(?=:|$)/, (_match, suffix: string) => {
-    if (/^[0-9A-F]{12}$/i.test(suffix)) return `GLS-${suffix.toUpperCase()}`;
+    if (/^(?:[0-9A-F]{8}|[0-9A-F]{12})$/i.test(suffix)) return `GLS-${suffix.toUpperCase()}`;
     if (Object.prototype.hasOwnProperty.call(DEMO_ORDER_IDS, suffix)) return DEMO_ORDER_IDS[suffix];
     // Stable conversion for legacy demo IDs; this is not an access token.
     let first = 0x811c9dc5;

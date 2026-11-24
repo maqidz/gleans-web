@@ -29,7 +29,7 @@ export function AdminSummaryCharts() {
   return <section className="mt-7" aria-label="Grafik pendapatan dan pesanan">
     <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Tren {days} hari terakhir</h2><div className="ml-auto flex flex-wrap items-center justify-end gap-3"><AdminFilterDropdown label={`Periode grafik: ${days} hari`} value={`${days} hari`} options={["7 hari","14 hari","30 hari"]} onChange={value=>setDays(parseInt(value,10))}/></div></div>
     <div className="grid min-w-0 gap-4 xl:grid-cols-2">
-      <BarChart title="NILAI PESANAN TERBAYAR" points={income} money/>
+      <BarChart title="TOTAL PENDAPATAN" points={income} money/>
       <BarChart title="TOTAL PESANAN" points={orders}/>
     </div>
   </section>;
@@ -55,6 +55,5 @@ function BarChart({ title, points, money = false }: { title: string; points: Poi
         </div>)}
       </div>
     </div></div>
-    {!total && <p className="mt-3 text-xs text-muted-foreground">Belum ada {money ? "pendapatan" : "pesanan"} pada periode ini.</p>}
   </article>;
 }

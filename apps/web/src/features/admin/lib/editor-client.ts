@@ -9,7 +9,7 @@ export async function editorRequest<T>(url: string, options?: RequestInit): Prom
 
 export function uploadEditorMedia(file: File) {
   if (!file.size) throw new Error("Pilih gambar terlebih dahulu.");
-  if (file.size > EDITOR_IMAGE_LIMIT) throw new Error("Ukuran gambar maksimal 4 MB.");
+  if (file.size > EDITOR_IMAGE_LIMIT) throw new Error("Ukuran gambar maksimal 2 MB.");
   const body = new FormData();
   body.set("file", file);
   return editorRequest<{ media: AdminMedia & { src: string } }>("/api/admin/site-media", { method: "POST", body });

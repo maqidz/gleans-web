@@ -4,8 +4,17 @@ import { readFile } from 'node:fs/promises';
 import ts from 'typescript';
 const source = await readFile(new URL('../src/features/admin/lib/live-data.ts', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
-const { mapAdminOrders, emptyAdminState } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
+const { mapAdminOrders, emptyAdminState, adminReportStatus } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 const row = (overrides = {}) => ({ id: 'GLS-123456789ABC', owner_id: null, customer_name: 'Guest', whatsapp: '08123456789', document_name: 'sample.pdf', amount: 10000, status: 'pending', fulfillment_status: 'pending', created_at: '2026-11-12T18:00:00Z', completed_at: null, ...overrides });
+test('manual reports become available only after payment and publication, until the download deadline', () => {
+  const now = Date.parse('2026-11-24T10:00:00Z');
+  const ready = row({status:'paid',fulfillment_status:'completed',report_expires_at:'2026-11-25T10:00:00Z'});
+  assert.equal(adminReportStatus(ready,now),'Siap diunduh');
+  for (const change of [{status:'pending'},{fulfillment_status:'processing'},{fulfillment_status:'failed'},{report_expires_at:null},{report_expires_at:'invalid'}]) {
+    assert.equal(adminReportStatus({...ready,...change},now),'Belum tersedia');
+  }
+  assert.equal(adminReportStatus(ready,Date.parse(ready.report_expires_at)),'Kedaluwarsa');
+});
 test('empty backend does not create demo customers or orders', () => {
   assert.deepEqual(mapAdminOrders([]), emptyAdminState());
   assert.equal(emptyAdminState().customers.length, 0);

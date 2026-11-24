@@ -29,7 +29,7 @@ The private bucket `shield-sandbox-documents` must exist. Never make it public. 
 1. Open `/deteksi-ai` without an account. Enter WhatsApp, optional promo, and a supported file up to 25MB / 25,000 words.
 2. `/api/payments/uploads` issues a presigned POST restricted to a server-generated staging key and declared maximum size. The browser uploads directly to Storage without receiving an admin key. Confirmation validates actual size/header and seals a snapshot at a different private key; reusing a staging URL cannot alter the order document.
 3. A short-lived, private upload ticket binds the file to an httpOnly guest cookie. `reserve_guest_order` consumes it atomically, applies server pricing, and binds the order to its guest hash and optional authenticated owner. Reusing a consumed ticket is rejected; request retries are idempotent.
-4. New invoice numbers use `GLS-` plus 12 cryptographically random uppercase hex characters. The primary key enforces uniqueness and the server retries three ID candidates on primary-key collisions only. Legacy UUID invoices are unchanged.
+4. New invoice numbers use `GLS-` plus 8 cryptographically random uppercase hex characters. The primary key enforces uniqueness and the server retries three ID candidates on primary-key collisions only. Legacy UUID invoices are unchanged.
 5. QRIS only: active channel priority SQ, NQ, SP. No VA/card fallback. The page supports pay and status checks without login. Gateway callbacks and manual checks independently query Duitku; return URL fields never prove payment. Explicit invoice rejection allows retry; ambiguous failures remain `creating` to prevent duplicates.
 6. A 256-bit per-order access code is derived from the guest secret and stored only as a hash. The originating browser automatically has download access. “Salin tautan akses” gives a private link with the code in its URL fragment, never the query string. The checkout exchanges that code for an httpOnly, order-specific cookie and removes the fragment. A customer on another device can use that link/code without creating an account.
 
@@ -47,7 +47,19 @@ Report downloads require either the configured account owner or a valid guest ac
 
 ## Admin fulfillment
 
-The existing `/admin/pesanan` now includes stored QRIS orders alongside the existing demo section. Only the configured admin identity (ID **and** email) can list these operational orders, download source documents, start processing paid orders, or upload actual PDF results. The report uploader uses the same sealed-upload mechanism. Publishing sets completion/24-hour expiry; database constraints reject unpaid publication and the trigger prevents extending or replacing a published report. No new admin users, role grants, or weaker auth settings are required by this feature.
+`/admin/pesanan` displays stored Shield orders from the backend. Only the configured admin identity (ID **and** email) can list these operational orders, download source documents, start processing paid orders, or upload actual PDF results. The report uploader uses the same sealed-upload mechanism. Publishing sets completion/24-hour expiry; database constraints reject unpaid publication and the trigger prevents extending or replacing a published report. No new admin users, role grants, or weaker auth settings are required by this feature.
+
+## Manual examination workflow
+
+The current examination workflow is manual and does not require a GPTZero API key or available API quota. GPTZero usage and API-key controls in Pengaturan are currently UI only; they do not measure quota, process documents, or automatically switch examination modes.
+
+1. Open a paid order in **Admin → Pesanan**, then choose **Mulai pemeriksaan**. Unpaid and completed orders cannot start processing.
+2. Use **Unduh dokumen** to obtain the original private file and examine it through GPTZero manually. The download endpoint checks the admin identity and issues a signed link valid for 60 seconds.
+3. In **Kelola laporan**, enter the actual AI score (0–100, at most two decimals), select the GPTZero PDF report (up to 25 MB), then choose **Simpan laporan & selesaikan**.
+4. Successful publication sets the order to completed and starts the customer's 24-hour download window. The report column and progress display show **Siap diunduh**, then **Kedaluwarsa** after that window.
+5. Publication queues the existing report-ready WhatsApp notification when Fonnte notifications are enabled. A Fonnte failure does not undo a saved report. Provider acceptance does not prove WhatsApp delivery.
+
+The report upload validates the PDF contents and is available only to the configured admin for a paid, unfinished order. Published reports and scores cannot be replaced. When an automatic GPTZero integration is added later, keep this manual route available independently of quota checks and API failures.
 
 ## Limits and integrity
 

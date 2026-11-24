@@ -11,6 +11,7 @@ import { uploadPaymentFile } from "@/features/payments/upload-file";
 import type { PaymentOrder } from "@/features/payments/types";
 import { formatBytes, formatRupiah } from "@/lib/format";
 import { ORDER_ARRIVED_EVENT } from "../lib/order-alerts";
+import { adminReportStatus } from "../lib/live-data";
 
 type Order = PaymentOrder & { ai_score: number | null; whatsapp: string; customer_name: string; document_bytes: number };
 const paymentLabels = { draft: "Belum dibayar", creating: "Menyiapkan pembayaran", pending: "Menunggu", paid: "Berhasil", failed: "Gagal", expired: "Kedaluwarsa" };
@@ -86,11 +87,11 @@ export function ShieldOrders() {
       <h1 className="text-2xl font-semibold sm:text-3xl">Pesanan</h1>
       <p className="mt-2 text-sm text-muted-foreground">Pantau pembayaran, pemeriksaan, dan pengiriman laporan.</p>
     </header>
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{metrics.map(([label, value]) => <section key={label} className={card}><p className="text-xs text-muted-foreground">{label}</p><p className="mt-4 text-2xl font-semibold">{loading ? "—" : value}</p></section>)}</div>
+    <div aria-busy={loading} className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">{metrics.map(([label, value]) => <section key={label} className={card}><p className="min-h-8 text-[11px] text-muted-foreground sm:min-h-0 sm:text-xs">{label}</p><p className="mt-2 text-2xl font-semibold sm:mt-4">{loading ? 0 : value}</p></section>)}</div>
     {error && !selected && <p role="alert" className="text-sm text-destructive">{error}</p>}
     <div className="overflow-hidden rounded-2xl border border-border">
       <div className="flex flex-col gap-4 border-b border-border p-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="shrink-0"><p className="text-xs text-muted-foreground">Total hasil</p><p aria-live="polite" className="mt-1 text-sm font-medium">{loading ? "Memuat…" : `${visible.length} pesanan`}</p></div>
+        <div className="shrink-0"><p className="text-xs text-muted-foreground">Total hasil</p><p aria-live="polite" className="mt-1 text-sm font-medium">{`${loading ? 0 : visible.length} pesanan`}</p></div>
         <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap xl:flex-nowrap">
           <FilterDropdown label="Filter pembayaran" value={payment} options={paymentOptions}
             className="w-full justify-start sm:w-fit" onChange={value => { setPayment(value); setPage(1); }} />
@@ -99,12 +100,12 @@ export function ShieldOrders() {
           <div className="flex h-10 min-w-0 items-center gap-2 rounded-full bg-surface px-3 focus-within:ring-2 focus-within:ring-primary sm:w-full xl:w-56"><Search aria-hidden="true" className="size-4 shrink-0 text-muted-foreground"/><input aria-label="Cari ID, dokumen, nama, atau WhatsApp" placeholder="Cari pesanan…" value={query} onChange={e => {setQuery(e.target.value); setPage(1);}} className="w-full min-w-0 bg-transparent text-sm outline-none"/></div>
         </div>
       </div>
-      <div role="region" aria-label="Tabel pesanan" tabIndex={0} className="overflow-x-auto outline-none focus-visible:ring-2 focus-visible:ring-primary"><table className="w-full min-w-[1060px] text-sm"><caption className="sr-only">Pesanan Shield dari checkout pelanggan</caption><thead className="bg-surface text-xs text-muted-foreground"><tr>{["PESANAN", "PELANGGAN", "DOKUMEN", "TOTAL", "PEMBAYARAN", "PEMERIKSAAN", "LAPORAN", "AKSI"].map(label => <th key={label} scope="col" className="whitespace-nowrap px-4 py-4 text-left font-medium">{label}</th>)}</tr></thead><tbody className="divide-y">{visible.slice((currentPage - 1) * 10, currentPage * 10).map(order => <tr key={order.id} className="hover:bg-surface/50">
+      <div role="region" aria-label="Tabel pesanan" aria-busy={loading} tabIndex={0} className="overflow-x-auto outline-none focus-visible:ring-2 focus-visible:ring-primary"><table className="w-full min-w-[1060px] text-sm"><caption className="sr-only">Pesanan Shield dari checkout pelanggan</caption><thead className="bg-surface text-xs text-muted-foreground"><tr>{["PESANAN", "PELANGGAN", "DOKUMEN", "TOTAL", "PEMBAYARAN", "PEMERIKSAAN", "LAPORAN", "AKSI"].map(label => <th key={label} scope="col" className="whitespace-nowrap px-4 py-4 text-left font-medium">{label}</th>)}</tr></thead><tbody className="divide-y">{visible.slice((currentPage - 1) * 10, currentPage * 10).map(order => <tr key={order.id} className="hover:bg-surface/50">
       <td className="px-4 py-5 align-top"><p className="whitespace-nowrap font-medium">{order.id}</p><p className="mt-1 whitespace-nowrap text-xs text-muted-foreground">{new Date(order.created_at).toLocaleDateString("id-ID", {day:"numeric",month:"short",year:"numeric"})}</p></td>
       <td className="px-4 py-5 align-top"><p className="font-medium">{order.customer_name || "Pelanggan tamu"}</p><p className="mt-1 whitespace-nowrap text-xs text-muted-foreground">{order.whatsapp || "—"}</p></td>
       <td className="max-w-64 break-words px-4 py-5 align-top [overflow-wrap:anywhere]">{order.document_name}<p className="mt-1 text-xs text-muted-foreground">{formatBytes(order.document_bytes)}</p></td>
       <td className="whitespace-nowrap px-4 py-5 align-top">{formatRupiah(order.amount)}</td>
-      <td className="px-4 py-5 align-top"><OrderBadge value={paymentLabels[order.status]}/></td><td className="px-4 py-5 align-top"><OrderBadge value={order.status === "paid" ? inspectionLabels[order.fulfillment_status] : "Belum diproses"}/></td><td className="px-4 py-5 align-top"><OrderBadge value="Belum dikirim"/></td>
+      <td className="px-4 py-5 align-top"><OrderBadge value={paymentLabels[order.status]}/></td><td className="px-4 py-5 align-top"><OrderBadge value={order.status === "paid" ? inspectionLabels[order.fulfillment_status] : "Belum diproses"}/></td><td className="px-4 py-5 align-top"><OrderBadge value={adminReportStatus(order)}/></td>
       <td className="sticky right-0 bg-white px-4 py-5 align-top"><div className="flex items-center gap-2">
         <Button variant="outline" size="icon" className="rounded-[10px] shadow-none" aria-label={`Detail pesanan ${order.id}`} title="Detail pesanan" onClick={() => {setSelectedId(order.id); setFile(null); setNotice(""); setError("");}}><Eye className="size-4"/></Button>
         <Button asChild variant="outline" size="icon" className="rounded-[10px] shadow-none"><a href={`/api/admin/shield-orders/${order.id}`} target="_blank" rel="noreferrer" aria-label={`Unduh dokumen ${order.id}`} title="Unduh dokumen"><Download className="size-4"/></a></Button>
@@ -136,7 +137,7 @@ export function ShieldOrders() {
 }
 
 function OrderBadge({value}: {value: string}) {
-  const color = ["Berhasil", "Selesai", "Terkirim"].includes(value) ? "bg-emerald-50 text-emerald-700" : ["Gagal", "Kedaluwarsa", "Perlu ditindaklanjuti"].includes(value) ? "bg-red-50 text-red-700" : ["Menunggu", "Antre", "Sedang diperiksa"].includes(value) ? "bg-accent text-primary" : "bg-surface text-muted-foreground";
+  const color = ["Berhasil", "Selesai", "Terkirim", "Siap diunduh"].includes(value) ? "bg-emerald-50 text-emerald-700" : ["Gagal", "Kedaluwarsa", "Perlu ditindaklanjuti"].includes(value) ? "bg-red-50 text-red-700" : ["Menunggu", "Antre", "Sedang diperiksa"].includes(value) ? "bg-accent text-primary" : "bg-surface text-muted-foreground";
   return <span className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${color}`}>{value}</span>;
 }
 
@@ -149,10 +150,11 @@ function OrderProgress({order}: {order: Order}) {
   const complete = paid && order.fulfillment_status === "completed";
   const paymentFailed = ["failed", "expired"].includes(order.status);
   const inspectionFailed = paid && order.fulfillment_status === "failed";
+  const reportStatus = adminReportStatus(order);
   const steps = [
     {label: "Pembayaran", detail: paymentLabels[order.status], done: paid, active: !paid && !paymentFailed, failed: paymentFailed},
     {label: "Pemeriksaan", detail: paid ? inspectionLabels[order.fulfillment_status] : "Belum diproses", done: complete, active: paid && !complete && !inspectionFailed, failed: inspectionFailed},
-    {label: "Laporan", detail: "Belum dikirim", done: false, active: complete, failed: false},
+    {label: "Laporan", detail: reportStatus, done: reportStatus === "Siap diunduh", active: false, failed: reportStatus === "Kedaluwarsa"},
   ];
   return <ol aria-label="Progres pesanan" className="grid grid-cols-3 py-2">
     {steps.map((step, index) => <li key={step.label} aria-current={step.active || step.failed ? "step" : undefined} className="relative min-w-0 text-center">

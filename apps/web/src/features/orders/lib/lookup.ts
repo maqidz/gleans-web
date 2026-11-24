@@ -4,7 +4,7 @@ export type OrderLookupQuery = { kind: "invoice"; invoice: string } | { kind: "w
 
 export function parseOrderLookup(input: string): OrderLookupQuery | null {
   const value = input.trim();
-  if (/^GLS-[0-9a-f]{12}$/i.test(value)) return { kind: "invoice", invoice: value.toUpperCase() };
+  if (/^GLS-(?:[0-9a-f]{8}|[0-9a-f]{12})$/i.test(value)) return { kind: "invoice", invoice: value.toUpperCase() };
   if (/^GLS-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) return { kind: "invoice", invoice: `GLS-${value.slice(4).toLowerCase()}` };
   const phone = value.replace(/[\s().-]/g, "");
   if (!/^(\+?62|0)8\d{7,12}$/.test(phone)) return null;

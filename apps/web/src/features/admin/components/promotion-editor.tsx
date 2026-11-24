@@ -182,7 +182,7 @@ export function AdminPromotionEditor({ existing, today }: { existing?: Promotion
                     event.target.value = "";
                     if (!file) return;
                     if (!file.size || file.size > EDITOR_IMAGE_LIMIT) {
-                      setError(!file.size ? "File gambar kosong." : "Ukuran gambar maksimal 4 MB.");
+                      setError(!file.size ? "File gambar kosong." : "Ukuran gambar maksimal 2 MB.");
                       return;
                     }
                     setError("");

@@ -7,6 +7,7 @@ const CATEGORY_COVERS: Record<string, string> = {
   "Tips & Trik": "/images/blog-thumbnail-tips.jpg",
   Tutorial: "/images/blog-thumbnail-tutorial.jpg",
   Edukasi: "/images/blog-thumbnail-edukasi.jpg",
+  Kampus: "/images/blog-thumbnail-kampus.svg",
 };
 
 const PALETTES: Record<string, string> = {
@@ -27,7 +28,8 @@ export function BlogCover({
   return (
     <div className={cn("relative aspect-video overflow-hidden rounded-xl bg-surface", className)}>
       {src ? (
-        <Image src={src} alt={post.coverAlt ?? ""} unoptimized={src.startsWith("https://")} fill className="object-cover" sizes="(min-width: 1024px) 372px, 100vw" />
+        <Image src={src} alt={post.coverAlt ?? ""} unoptimized={src.startsWith("https://")} fill className="object-cover"
+          sizes={size === "hero" ? "(min-width: 1280px) 560px, (min-width: 768px) 50vw, 100vw" : "(min-width: 1024px) 372px, 100vw"} />
       ) : (
         <div
           className={cn(

@@ -25,13 +25,13 @@ export function PromotionCarousel({ banners, onDismiss }: { banners: PromotionSl
 
   if (!banner) return null;
 
-  const navigation = banners.length > 1 && <div className="-ml-2 mt-1 flex flex-wrap items-center" role="group" aria-label="Navigasi banner">
+  const navigation = banners.length > 1 && <div className="-ml-1 mt-1 flex flex-wrap items-center" role="group" aria-label="Navigasi banner">
     {banners.map((slide, position) => <button
       key={slide.id}
       type="button"
       aria-label={`Tampilkan banner ${position + 1} dari ${banners.length}`}
       aria-current={position === current ? "true" : undefined}
-      className="group grid size-6 place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-ring"
+      className="group grid h-6 w-4 place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-ring"
       onClick={() => setIndex(position)}
     >
       <span aria-hidden="true" className="size-2 rounded-full bg-muted-foreground/40 group-hover:bg-primary/70 group-aria-[current=true]:bg-primary" />

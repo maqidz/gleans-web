@@ -18,7 +18,7 @@ export default async function BlogPage({ searchParams }: { searchParams: Promise
   const { kategori } = await searchParams;
   const posts = await listPublishedArticles();
   const active = BLOG_CATEGORIES.find((c) => categorySlug(c) === kategori);
-  const featured = posts.find(post => post.featured) ?? posts[0];
+  const featured = posts.find(post => post.featured);
   const list = active ? posts.filter((p) => p.category === active) : posts;
 
   return (
@@ -31,16 +31,18 @@ export default async function BlogPage({ searchParams }: { searchParams: Promise
         />
 
         {featured && (
-          <Link href={`/blog/${featured.slug}`} className="group flex flex-col gap-5">
+          <Link href={`/blog/${featured.slug}`} className="group grid items-center gap-6 md:grid-cols-2 lg:gap-10">
             <BlogCover
               post={featured}
               size="hero"
-              className="aspect-[16/7]"
+              className="aspect-video"
             />
             <div className="flex flex-col gap-3">
+              <span className="w-fit rounded-full border border-primary px-3 py-1 text-xs font-medium tracking-wide text-primary">UNGGULAN</span>
               <h2 className="group-hover:text-primary text-2xl leading-snug font-medium lg:text-[32px]">
                 {featured.title}
               </h2>
+              {featured.excerpt && <p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground md:text-base">{featured.excerpt}</p>}
               <PostByline post={featured} />
             </div>
           </Link>

@@ -7,17 +7,17 @@ export async function preparePaymentUpload(file: File, purpose: "document" | "re
   return upload;
 }
 
-export async function finishPaymentUpload(file: File, upload: PaymentUpload): Promise<string> {
+export async function finishPaymentUpload(file: File, upload: PaymentUpload, report?: { aiScore: number }): Promise<string> {
   const form = new FormData();
   for (const [key, value] of Object.entries(upload.fields)) form.append(key, String(value));
   form.append("file", file);
   if (!(await fetch(upload.uploadUrl, { method: "POST", body: form })).ok) throw new Error("Dokumen belum dapat diunggah. Silakan coba kembali.");
-  const confirmed = await fetch(`/api/payments/uploads/${encodeURIComponent(upload.ticket)}`, { method: "POST", credentials: "same-origin" });
+  const confirmed = await fetch(`/api/payments/uploads/${encodeURIComponent(upload.ticket)}`, { method: "POST", credentials: "same-origin", ...(report ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(report) } : {}) });
   const result = await confirmed.json();
   if (!confirmed.ok) throw new Error(result.error || "Unggahan belum dapat dikonfirmasi.");
   return upload.ticket;
 }
 
-export async function uploadPaymentFile(file: File, purpose: "document" | "report" = "document", orderId?: string): Promise<string> {
-  return finishPaymentUpload(file, await preparePaymentUpload(file, purpose, orderId));
+export async function uploadPaymentFile(file: File, purpose: "document" | "report" = "document", orderId?: string, report?: { aiScore: number }): Promise<string> {
+  return finishPaymentUpload(file, await preparePaymentUpload(file, purpose, orderId), report);
 }

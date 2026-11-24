@@ -26,7 +26,7 @@ export function PromotionBanner({ banner, onDismiss, navigation }: {
           {banner.description || "Promosi Gleans"}
         </DialogDescription>
         {navigation}
-        {banner.href && <Button asChild size="pill-sm" className="mt-4 max-w-full whitespace-normal">
+        {banner.href && <Button asChild size="pill-sm" className="mt-3 h-12 w-full whitespace-normal">
           <Link href={banner.href} onClick={onDismiss}>{banner.buttonLabel?.trim() || "Lihat promo"}</Link>
         </Button>}
       </div>

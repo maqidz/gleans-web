@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@gleans/ui/tabs";
 import type { AdminMedia } from "../lib/media";
 import { editorRequest, uploadEditorMedia } from "../lib/editor-client";
 import { useAdmin } from "./provider";
+import { WhatsAppSettings } from "./whatsapp-settings";
 
 type Activity = { id: number; at: string; actor: string; action: string; object: string };
 const date = new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta" });
@@ -21,11 +22,12 @@ export function AdminSettings() {
   return <>
     <div className="mb-7">
       <h1 className="text-2xl font-semibold sm:text-3xl">Pengaturan</h1>
-      <p className="mt-2 text-sm text-muted-foreground">Kelola akun admin, aktivitas, dan pustaka media Gleans.</p>
+      <p className="mt-2 text-sm text-muted-foreground">Kelola akun admin, notifikasi, aktivitas, dan pustaka media Gleans.</p>
     </div>
-    <Tabs defaultValue={tab === "media" || tab === "activity" ? tab : "admin"} className="min-w-0 gap-7">
-      <TabsList className="h-10 group-data-horizontal/tabs:h-10 rounded-full bg-surface p-1">
+    <Tabs defaultValue={tab === "media" || tab === "activity" || tab === "notifications" ? tab : "admin"} className="min-w-0 gap-7">
+      <TabsList className="h-10 max-w-full overflow-x-auto group-data-horizontal/tabs:h-10 rounded-full bg-surface p-1">
         <TabsTrigger className="rounded-full px-5 py-2" value="admin">Admin</TabsTrigger>
+        <TabsTrigger className="rounded-full px-5 py-2" value="notifications">Notifikasi</TabsTrigger>
         <TabsTrigger className="rounded-full px-5 py-2" value="activity">Aktivitas</TabsTrigger>
         <TabsTrigger className="rounded-full px-5 py-2" value="media">Media</TabsTrigger>
       </TabsList>
@@ -38,6 +40,7 @@ export function AdminSettings() {
           </div>
         </section>
       </TabsContent>
+      <TabsContent value="notifications"><WhatsAppSettings /></TabsContent>
       <TabsContent value="activity"><ActivityList /></TabsContent>
       <TabsContent value="media"><MediaLibrary /></TabsContent>
     </Tabs>

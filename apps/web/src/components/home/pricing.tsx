@@ -5,7 +5,7 @@ import { Button } from "@gleans/ui/button";
 import { formatRupiah } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-import { PLANS } from "@/lib/plans";
+import { PLANS, planBenefits } from "@/lib/plans";
 import { displayShieldPricing } from "@/features/orders/lib/shield-pricing";
 
 const PLAN_ICONS = {
@@ -56,7 +56,7 @@ export async function Pricing() {
                       <p>{plan.blurb}</p>
                     </div>
                     <ul className="flex flex-col gap-3">
-                      {[`${plan.checks}x Cek Plagiarisme`, "Dapatkan prioritas pelayanan", "Notifikasi Whatsapp"].map(
+                      {planBenefits(plan).map(
                         (f) => (
                           <li key={f} className="flex items-center gap-2">
                             <CircleCheck className="size-6 shrink-0 fill-primary text-white" />

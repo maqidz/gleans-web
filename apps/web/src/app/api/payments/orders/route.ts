@@ -17,11 +17,11 @@ export async function POST(request: Request) {
     duitkuConfig();
     const raw = await request.text(); if (raw.length > 4096) return json({ error: "Data pesanan terlalu besar." }, 413);
     const parsed = schema.safeParse(JSON.parse(raw)); if (!parsed.success) return json({ error: "Data pesanan tidak valid." }, 400);
-    const input = parsed.data; const user = await dashboardUser(); const guest = await guestSession();
+    const input = parsed.data;
+    const [user, guest, price] = await Promise.all([dashboardUser(), guestSession(), readShieldPrice()]);
     if (input.method !== "qris" && !user) return json({ error: "Masuk untuk menggunakan saldo atau kuota Gleans." }, 401);
     if (!guest) return json({ error: "Unggah dokumen terlebih dahulu." }, 400);
     const email = input.email || user?.email || "";
-    const price = await readShieldPrice();
     const promo = input.promo ? await readActivePromo(input.promo, price) : null;
     const invalidPromo = Boolean(input.promo && !promo);
     const amount = price - (promo?.discount ?? 0);

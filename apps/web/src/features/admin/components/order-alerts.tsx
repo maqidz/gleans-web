@@ -36,9 +36,9 @@ function createNotificationSound() {
       output = master;
       const start = context.currentTime + 0.015;
 
-      // Three rising bell notes, each with a finite, fading tail.
-      [1046.5, 1318.51, 1567.98].forEach((frequency, index) => {
-        const at = start + index * 0.13;
+      // A short two-note bell, with both tails finished within 0.36 seconds.
+      [1046.5, 1318.51].forEach((frequency, index) => {
+        const at = start + index * 0.11;
         [[1, 0.22], [2.76, 0.035], [5.4, 0.008]].forEach(([ratio, volume]) => {
           const oscillator = context.createOscillator();
           const envelope = context.createGain();
@@ -46,8 +46,8 @@ function createNotificationSound() {
           oscillator.frequency.setValueAtTime(frequency * ratio, at);
           envelope.gain.setValueAtTime(0, at);
           envelope.gain.linearRampToValueAtTime(volume, at + 0.008);
-          envelope.gain.exponentialRampToValueAtTime(0.0001, at + 0.7);
-          envelope.gain.linearRampToValueAtTime(0, at + 0.74);
+          envelope.gain.exponentialRampToValueAtTime(0.0001, at + 0.21);
+          envelope.gain.linearRampToValueAtTime(0, at + 0.24);
           oscillator.connect(envelope);
           envelope.connect(master);
           sources.push(oscillator);
@@ -61,7 +61,7 @@ function createNotificationSound() {
             }
           };
           oscillator.start(at);
-          oscillator.stop(at + 0.75);
+          oscillator.stop(at + 0.25);
         });
       });
       return true;

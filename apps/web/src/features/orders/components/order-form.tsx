@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ShieldPriceChanged, startCheckoutTransition } from "@/features/payments/checkout-transition";
 import { useBillingTotals } from "@/features/payments/billing/client";
-import { finishPaymentUpload, preparePaymentUpload, uploadPaymentFile } from "@/features/payments/upload-file";
+import { prepareCheckoutUpload } from "@/features/payments/upload-file";
 import { useDropzone } from "react-dropzone";
 import { FileText, FileUp, Layers, Loader2, Phone, QrCode, TicketPercent, Wallet, X } from "lucide-react";
 import { toast } from "sonner";
@@ -24,8 +24,8 @@ import {
 } from "@/features/orders/lib/order";
 import { cn } from "@/lib/utils";
 
-type UploadPreparation = ReturnType<typeof preparePaymentUpload>;
-type Document = { file: File; words: number; requestId: string; preparation: UploadPreparation; preparedAt: number };
+type CheckoutUpload = ReturnType<typeof prepareCheckoutUpload>;
+type Document = { file: File; words: number; requestId: string; upload: CheckoutUpload };
 
 const PAYMENT_METHODS = [
   { id: "qris", label: "QRIS", icon: QrCode },
@@ -43,10 +43,11 @@ export function OrderForm({ price: initialPrice }: { price: number }) {
   const [promoBusy, setPromoBusy] = useState(false);
   const [document, setDocument] = useState<Document | null>(null);
   const [reading, setReading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [paying, setPaying] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<(typeof PAYMENT_METHODS)[number]["id"]>("qris");
   const { totals, error: billingError, authRequired } = useBillingTotals(paymentMethod !== "qris");
-  const preparingUpload = useRef<UploadPreparation | null>(null);
+  const preparingUpload = useRef<Promise<string> | null>(null);
 
   const subtotal = document ? price : 0;
   const discount = document ? (promo?.discount ?? 0) : 0;
@@ -75,11 +76,11 @@ export function OrderForm({ price: initialPrice }: { price: number }) {
       }
       const requestId = crypto.randomUUID();
       router.prefetch(`/pembayaran?checkout=${requestId}`);
-      // Serialize ticket requests so a first-time guest cookie is in place if a file is replaced.
-      const preparation = Promise.resolve(preparingUpload.current).catch(() => null).then(() => preparePaymentUpload(file));
-      preparingUpload.current = preparation;
-      void preparation.catch(() => {});
-      setDocument({ file, words, requestId, preparation, preparedAt: Date.now() });
+      setUploading(true);
+      const upload = prepareCheckoutUpload(file, preparingUpload.current);
+      preparingUpload.current = upload.ready;
+      await upload.ready;
+      setDocument({ file, words, requestId, upload });
       toast.success(`${file.name} siap diproses.`);
     } catch (error) {
       const detail = error instanceof Error ? error.message : "";
@@ -89,6 +90,7 @@ export function OrderForm({ price: initialPrice }: { price: number }) {
           : "Gagal membaca dokumen. Coba unggah ulang atau pakai format lain.",
       );
     } finally {
+      setUploading(false);
       setReading(false);
     }
   }
@@ -128,22 +130,15 @@ export function OrderForm({ price: initialPrice }: { price: number }) {
   }
 
   function handlePay() {
-    if (paying || !paymentAllowed) return;
+    if (paying || reading || promoBusy || !paymentAllowed) return;
     const parsed = whatsappSchema.safeParse(whatsapp);
     if (!parsed.success) { setWhatsappError(parsed.error.issues[0].message); return; }
     setWhatsappError(null);
     if (!document) { toast.error("Unggah dokumen yang mau diperiksa."); return; }
     setPaying(true);
-    const { file, words, requestId, preparation, preparedAt } = document;
-    let ticketId: string | undefined;
-    let usePreparation = Date.now() - preparedAt < 10 * 60_000;
+    const { file, words, requestId, upload } = document;
     startCheckoutTransition(requestId, { document_name: file.name, amount: total, method: paymentMethod }, async expectedAmount => {
-      if (usePreparation) {
-        usePreparation = false;
-        const upload = await preparation.catch(() => null);
-        if (upload) ticketId = await finishPaymentUpload(file, upload);
-      }
-      ticketId ??= await uploadPaymentFile(file);
+      const ticketId = await upload.getTicket();
       const response = await fetch("/api/payments/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, ticketId, words, whatsapp: parsed.data, method: paymentMethod, expectedAmount, ...(promo ? { promo: promo.code } : {}) }) });
       const body = await response.json();
       if (response.status === 409 && body.code === "SHIELD_PRICE_CHANGED") throw new ShieldPriceChanged(body.error, body.amount);
@@ -193,9 +188,12 @@ export function OrderForm({ price: initialPrice }: { price: number }) {
             <Input
               id="promo"
               value={promoInput}
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
               disabled={promoBusy || paying}
               onChange={(e) => {
-                setPromoInput(e.target.value);
+                setPromoInput(e.target.value.toUpperCase());
                 setPromo(null);
               }}
               placeholder="Masukkan Kode Promo"
@@ -206,7 +204,7 @@ export function OrderForm({ price: initialPrice }: { price: number }) {
               size="pill-sm"
               onClick={applyPromo}
               disabled={promoBusy || paying}
-              className="absolute top-1/2 right-1 w-[104px] -translate-y-1/2 text-xs font-normal sm:text-sm"
+              className="absolute inset-y-0 right-1 my-auto w-[104px] text-xs font-normal active:not-aria-[haspopup]:translate-y-0 sm:text-sm"
             >
               {promoBusy ? "Memeriksa…" : "Gunakan"}
             </Button>
@@ -232,7 +230,7 @@ export function OrderForm({ price: initialPrice }: { price: number }) {
             </span>
             <div className="flex w-full min-w-0 flex-col gap-1">
               <p className="truncate font-semibold">
-                {reading ? "Membaca dokumen..." : document ? document.file.name : "Upload File"}
+                {reading ? uploading ? "Mengunggah dokumen..." : "Membaca dokumen..." : document ? document.file.name : "Upload File"}
               </p>
               <p className="text-muted-foreground text-sm">
                 {document && !reading

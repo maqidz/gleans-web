@@ -22,9 +22,9 @@ export function DashboardOverview() {
   }, []);
   const totalOrders = history.data?.pages[0]?.total;
   const stats = [
-    { label: "TOTAL SALDO", value: totals ? formatRupiah(totals.balance) : "—", icon: Wallet, href: "/dashboard/paket-saldo", action: "Isi saldo" },
-    { label: "TOTAL KUOTA", value: totals ? String(totals.quota) : "—", icon: Layers, href: "/dashboard/paket-saldo", action: "Lihat paket" },
-    { label: "TOTAL PESANAN", value: totalOrders?.toLocaleString("id-ID") ?? "—", icon: Clock3, href: "/dashboard/pesanan", action: "Lihat pesanan" },
+    { label: "TOTAL SALDO", value: formatRupiah(totals?.balance ?? 0), icon: Wallet, href: "/dashboard/paket-saldo", action: "Isi saldo" },
+    { label: "TOTAL KUOTA", value: String(totals?.quota ?? 0), icon: Layers, href: "/dashboard/paket-saldo", action: "Lihat paket" },
+    { label: "TOTAL PESANAN", value: (totalOrders ?? 0).toLocaleString("id-ID"), icon: Clock3, href: "/dashboard/pesanan", action: "Lihat pesanan" },
   ];
 
   return <>

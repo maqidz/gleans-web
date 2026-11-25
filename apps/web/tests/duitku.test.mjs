@@ -156,6 +156,60 @@ test('cross-origin writes and missing origins are rejected', async()=>{
   assert.equal(sameOrigin(request(null)),false);
   assert.equal(sameOrigin(request('null')),false);
 });
+
+test('QR checkout uses a valid order capability before requesting account identity', async () => {
+  const order = {
+    id: 'GLS-01234567', owner_id: 'owner-a', status: 'pending', qr_string: 'test-qr',
+    fulfillment_status: 'pending', report_expires_at: null,
+  };
+  let capability = true;
+  let userId = 'owner-a';
+  let identityRequests = 0;
+  globalThis.__checkoutAccessTest = {
+    findOrder: async () => order,
+    orderAccess: async () => ({ allowed: capability, code: capability ? 'dummy-capability' : null }),
+    dashboardUser: async () => { identityRequests += 1; return { id: userId }; },
+  };
+  try {
+    const { GET } = await moduleFrom('src/app/api/payments/orders/[id]/route.ts', {
+      'import { orderAccess } from "@/features/payments/server/guest";': 'const {orderAccess} = globalThis.__checkoutAccessTest;',
+      'import { allowOrderLookup } from "@/features/payments/server/lookup-limit";': 'const allowOrderLookup = async () => true;',
+      'import { dashboardUser } from "@/features/auth/server";': 'const {dashboardUser} = globalThis.__checkoutAccessTest;',
+      '"@/features/payments/server/duitku"': JSON.stringify(await moduleUrlFrom('src/features/payments/server/duitku.ts')),
+      'import { findOrder, ORDER_COLUMNS, paymentAdmin, publicOrder } from "@/features/payments/server/repository";': 'const {findOrder} = globalThis.__checkoutAccessTest; const ORDER_COLUMNS = "id,status,qr_string"; const paymentAdmin = () => { throw new Error("Unexpected write"); }; const publicOrder = ({id,status,qr_string}) => ({id,status,qr_string});',
+      'import { reconcilePayment } from "@/features/payments/server/service";': 'const reconcilePayment = () => { throw new Error("Unexpected gateway call"); };',
+      '"@/features/payments/server/http"': JSON.stringify(await moduleUrlFrom('src/features/payments/server/http.ts')),
+    });
+    const load = async () => {
+      const response = await GET(new Request('http://localhost:3000/api/payments/orders/GLS-01234567'), { params: Promise.resolve({ id: order.id }) });
+      assert.equal(response.status, 200);
+      return (await response.json()).order;
+    };
+    const guest = await load();
+    assert.equal(guest.qr_string, 'test-qr');
+    assert.equal(guest.has_access, true);
+    assert.equal(guest.can_download, false);
+    assert.equal(identityRequests, 0);
+
+    capability = false;
+    assert.equal((await load()).has_access, true);
+    assert.equal(identityRequests, 1, 'an account owner without an order capability still requires provider validation');
+    userId = 'another-owner';
+    const unrelated = await load();
+    assert.equal(unrelated.has_access, false);
+    assert.equal(unrelated.access_code, null);
+    assert.equal(unrelated.can_download, false);
+
+    capability = true;
+    order.status = 'paid';
+    order.fulfillment_status = 'completed';
+    order.report_expires_at = new Date(Date.now() + 60_000).toISOString();
+    assert.equal((await load()).can_download, true);
+    order.report_expires_at = new Date(Date.now() - 1).toISOString();
+    assert.equal((await load()).can_download, false);
+    assert.equal(identityRequests, 2);
+  } finally { delete globalThis.__checkoutAccessTest; }
+});
 test('minimum amount rejection remains retryable with a safe message',async()=>{
   const previous={...process.env};const originalFetch=globalThis.fetch;
   Object.assign(process.env,{DUITKU_ENV:'sandbox',DUITKU_MERCHANT_CODE:'DS123',DUITKU_API_KEY:'test-secret',DUITKU_PUBLIC_URL:'https://shop.example.test'});

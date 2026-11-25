@@ -13,7 +13,8 @@ export async function GET(request: Request, context: Context) {
     if (!await allowOrderLookup(request, "checkout")) return json({ error: "Terlalu banyak permintaan. Coba kembali dalam satu menit." }, 429);
     const order = await findOrder((await context.params).id);
     if (!order) return json({ error: "Pesanan tidak ditemukan." }, 404);
-    const access = await orderAccess(order, order.owner_id ? (await dashboardUser())?.id : undefined);
+    const access = await orderAccess(order);
+    if (!access.allowed && order.owner_id) access.allowed = (await dashboardUser())?.id === order.owner_id;
     return json({ order: { ...publicOrder(order), has_access: access.allowed, can_download: access.allowed && order.status === "paid" && order.fulfillment_status === "completed" && Date.parse(order.report_expires_at ?? "") > Date.now(), access_code: access.code } });
   } catch (error) { return paymentError(error); }
 }

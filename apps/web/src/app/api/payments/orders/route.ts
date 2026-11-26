@@ -9,6 +9,8 @@ import { duitkuConfig } from "@/features/payments/server/duitku";
 import { ORDER_COLUMNS, paymentAdmin, publicOrder, type StoredOrder } from "@/features/payments/server/repository";
 import { guestSession, accessDigest, orderAccessCode } from "@/features/payments/server/guest";
 import { json, paymentError, sameOrigin } from "@/features/payments/server/http";
+import { hasCompletedShieldCheck } from "@/features/orders/server/promo-eligibility";
+import { RECHECK_PROMO_MESSAGE } from "@/features/orders/lib/promo-eligibility";
 export const runtime = "nodejs";
 const schema = z.object({ requestId: z.string().uuid(), ticketId: z.string().uuid(), words: z.number().int().min(0).max(25000), whatsapp: whatsappSchema, email: z.string().trim().email().max(50).optional(), name: z.string().trim().min(1).max(80).optional(), promo: z.string().max(40).optional(), method: z.enum(["qris", "balance", "quota"]).default("qris"), expectedAmount: z.number().int().min(1).max(MAX_SHIELD_PRICE).optional() }).strict();
 export async function POST(request: Request) {
@@ -24,6 +26,7 @@ export async function POST(request: Request) {
     const email = input.email || user?.email || "";
     const promo = input.promo ? await readActivePromo(input.promo, price) : null;
     const invalidPromo = Boolean(input.promo && !promo);
+    const ineligiblePromo = Boolean(promo?.requiresCompletedCheck && !await hasCompletedShieldCheck({ userId: user?.id, guestHash: guest.hash }));
     const amount = price - (promo?.discount ?? 0);
     const admin = paymentAdmin();
     const created = (order: StoredOrder) => json({
@@ -31,7 +34,7 @@ export async function POST(request: Request) {
       access_code: order.guest_hash === guest.hash ? orderAccessCode(guest.secret, order.id) : null,
     }, 201);
     const expectedAmount = input.expectedAmount ?? SHIELD_PRICE - (input.promo ? resolvePromo(input.promo, SHIELD_PRICE)?.discount ?? 0 : 0);
-    if (invalidPromo || (input.method !== "quota" && expectedAmount !== amount)) {
+    if (invalidPromo || ineligiblePromo || (input.method !== "quota" && expectedAmount !== amount)) {
       // A retry of a request that already created an invoice keeps its original amount.
       const existing = admin.database.from("duitku_orders").select(`${ORDER_COLUMNS},guest_hash`).eq("request_key", input.requestId);
       const scoped = !user ? existing.eq("guest_hash", guest.hash)
@@ -45,6 +48,7 @@ export async function POST(request: Request) {
         return created(data as StoredOrder);
       }
       if (invalidPromo) return json({ error: "Kode promo sudah tidak berlaku. Kembali ke formulir untuk melanjutkan pesanan." }, 400);
+      if (ineligiblePromo) return json({ error: RECHECK_PROMO_MESSAGE, code: "PROMO_REQUIRES_COMPLETED_CHECK" }, 403);
       return json({ error: "Tarif Shield berubah. Periksa total baru sebelum melanjutkan pembayaran.", code: "SHIELD_PRICE_CHANGED", amount }, 409);
     }
     const { data, error } = await reserveInvoice(id => {

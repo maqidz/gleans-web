@@ -96,6 +96,8 @@ test('a stale Shield checkout needs approval and an invoice retry keeps the stor
       '"@/features/orders/lib/pricing"': JSON.stringify(pricingUrl),
       'import { readShieldPrice } from "@/features/orders/lib/shield-pricing";': 'const {readShieldPrice} = globalThis.__shieldQuoteTest;',
       'import { readActivePromo } from "@/features/admin/lib/site-editor";': 'const readActivePromo = (code, price) => resolvePromo(code, price);',
+      'import { hasCompletedShieldCheck } from "@/features/orders/server/promo-eligibility";': 'const hasCompletedShieldCheck = async () => false;',
+      'import { RECHECK_PROMO_MESSAGE } from "@/features/orders/lib/promo-eligibility";': 'const RECHECK_PROMO_MESSAGE = "Pemeriksaan sebelumnya belum selesai.";',
       '"@/lib/plans"': JSON.stringify(await moduleUrlFrom('src/lib/plans.ts')),
       'import { duitkuConfig } from "@/features/payments/server/duitku";': 'const duitkuConfig = () => ({});',
       'import { ORDER_COLUMNS, paymentAdmin, publicOrder, type StoredOrder } from "@/features/payments/server/repository";': 'const {paymentAdmin} = globalThis.__shieldQuoteTest; const ORDER_COLUMNS = "id,amount"; const publicOrder = order => order;',

@@ -3,6 +3,7 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { paymentAdmin } from "@/features/payments/server/repository";
 import { calculatePromo, type AppliedPromo } from "@/features/orders/lib/pricing";
+import { requiresCompletedCheck } from "@/features/orders/lib/promo-eligibility";
 import type { Post } from "@/features/blog/lib/content";
 import { BLOG_AUTHOR, type AdminState } from "./model";
 import type { AdminMedia } from "./media";
@@ -146,7 +147,7 @@ export const activeSitePromotions = unstable_cache(async () => {
   return (data ?? []).map(row => ({ ...row.record as Promotion, revision: String(row.updated_at) }));
 }, ["active-site-promotions"], { tags: [PROMOTION_TAG], revalidate: 60 });
 
-export async function readActivePromo(input: string, price: number): Promise<AppliedPromo | null> {
+export async function readActivePromo(input: string, price: number): Promise<(AppliedPromo & { requiresCompletedCheck: boolean }) | null> {
   const code = input.trim().toUpperCase();
   const today = jakartaDate();
   const { data, error } = await paymentAdmin().database.from("site_promotions").select("record")
@@ -154,5 +155,5 @@ export async function readActivePromo(input: string, price: number): Promise<App
   if (error) throw error;
   if (!data) return null;
   const promo = data.record as Promotion;
-  return calculatePromo(code, promo.discount, promo.discountType === "percentage", price);
+  return { ...calculatePromo(code, promo.discount, promo.discountType === "percentage", price), requiresCompletedCheck: requiresCompletedCheck(promo) };
 }

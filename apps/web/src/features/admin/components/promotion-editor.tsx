@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { AdminState } from "../lib/model";
 import { EDITOR_IMAGE_LIMIT, type AdminMedia } from "../lib/media";
 import { editorRequest, saveEditorRecord, uploadEditorMedia } from "../lib/editor-client";
+import { requiresCompletedCheck } from "@/features/orders/lib/promo-eligibility";
 
 type Promotion = AdminState["promos"][number];
 const input = "h-11 w-full min-w-0 rounded-full border bg-background px-3.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -139,6 +140,12 @@ export function AdminPromotionEditor({ existing, today }: { existing?: Promotion
               </PromotionSelect>
               <Field label="Diskon"><input className={input} type="number" required min={1} max={draft.discountType === "percentage" ? 100 : 1000000} value={draft.discount} onChange={event => change("discount", Number(event.target.value))} /></Field>
             </div>
+            <label className="flex items-start gap-3 rounded-2xl border p-3.5 text-sm">
+              <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-primary" checked={requiresCompletedCheck(draft)}
+                onChange={event => change("requiresCompletedCheck", event.target.checked)} />
+              <span><span className="block font-medium">Minimal 1 pemeriksaan selesai</span>
+                <span className="mt-1 block text-xs text-muted-foreground">Khusus pelanggan yang sudah membayar dan menerima hasil pemeriksaan Shield.</span></span>
+            </label>
           </> : <>
             <Field label="Deskripsi"><textarea className="min-h-24 w-full rounded-2xl border bg-background p-3.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" maxLength={500} value={draft.description ?? ""} onChange={event => change("description", event.target.value)} /></Field>
             {draft.type === "Banner" && <div className="space-y-2">

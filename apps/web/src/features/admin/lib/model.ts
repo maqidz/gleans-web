@@ -21,6 +21,7 @@ export const blogSchema = z.object({ id: text, title: text, slug: z.string().reg
 export const promoSchema = z.object({
   id: text, name: text, title: text, type: z.enum(["Banner", "Popup", "Kode promo"]),
   code: z.string().max(40), discount: money, discountType: z.enum(["fixed", "percentage"]).optional(),
+  requiresCompletedCheck: z.boolean().optional(),
   start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), active: z.boolean(),
   description: z.string().max(500).optional(), href: z.string().max(400).optional(),
   imageUrl: z.string().max(2048).optional(), buttonLabel: z.string().trim().max(60).optional(),

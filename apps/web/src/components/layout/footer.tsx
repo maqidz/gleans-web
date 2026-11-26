@@ -1,6 +1,6 @@
-import Image from "next/image";
 import Link from "next/link";
-import { TikTokIcon, WhatsAppIcon } from "@/components/brand/icons";
+import { Mail } from "lucide-react";
+import { InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/brand/icons";
 import { Logo } from "@/components/brand/logo";
 import { CONTACT, PRICING_LINK } from "@/config/site";
 
@@ -40,7 +40,7 @@ export function Footer() {
                 {CONTACT.phone}
               </a>
               <a href={`mailto:${CONTACT.email}`} className="footer-contact">
-                <ContactIcon src="/images/icon-sms.webp" />
+                <Mail aria-hidden="true" strokeWidth={1.5} className="size-5 shrink-0" />
                 {CONTACT.email}
               </a>
               <a
@@ -50,7 +50,7 @@ export function Footer() {
                 aria-label={`Instagram ${CONTACT.instagram}`}
                 className="footer-contact"
               >
-                <ContactIcon src="/images/icon-instagram.webp" />
+                <InstagramIcon className="size-5 shrink-0" />
                 {CONTACT.instagram}
               </a>
               <a
@@ -92,10 +92,6 @@ function FooterColumn({
       </ul>
     </div>
   );
-}
-
-function ContactIcon({ src }: { src: string }) {
-  return <Image src={src} alt="" width={20} height={20} className="size-5 shrink-0" />;
 }
 
 function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {

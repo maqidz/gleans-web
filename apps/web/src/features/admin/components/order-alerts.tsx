@@ -31,23 +31,27 @@ function createNotificationSound() {
       if (current !== generation) return false;
 
       const master = context.createGain();
-      master.gain.value = 0.55;
+      master.gain.value = 1;
       master.connect(context.destination);
       output = master;
-      const start = context.currentTime + 0.015;
+      const start = context.currentTime;
 
-      // A short two-note bell, with both tails finished within 0.36 seconds.
-      [1046.5, 1318.51].forEach((frequency, index) => {
-        const at = start + index * 0.11;
-        [[1, 0.22], [2.76, 0.035], [5.4, 0.008]].forEach(([ratio, volume]) => {
+      // Restore the original "de-ring": a short pickup and a brighter, fading bell.
+      const notes = [
+        { frequency: 783.99, offset: 0, duration: 0.2, volume: 0.13 },
+        { frequency: 1046.5, offset: 0.14, duration: 0.95, volume: 0.16 },
+      ];
+      notes.forEach(note => {
+        [1, 2, 2.997].forEach((partial, index) => {
+          const at = start + note.offset;
+          const duration = note.duration / (1 + index * 0.65);
           const oscillator = context.createOscillator();
           const envelope = context.createGain();
           oscillator.type = "sine";
-          oscillator.frequency.setValueAtTime(frequency * ratio, at);
+          oscillator.frequency.setValueAtTime(note.frequency * partial, at);
           envelope.gain.setValueAtTime(0, at);
-          envelope.gain.linearRampToValueAtTime(volume, at + 0.008);
-          envelope.gain.exponentialRampToValueAtTime(0.0001, at + 0.21);
-          envelope.gain.linearRampToValueAtTime(0, at + 0.24);
+          envelope.gain.linearRampToValueAtTime(note.volume / (1 + index * 4), at + 0.006);
+          envelope.gain.exponentialRampToValueAtTime(0.0001, at + duration);
           oscillator.connect(envelope);
           envelope.connect(master);
           sources.push(oscillator);
@@ -61,7 +65,7 @@ function createNotificationSound() {
             }
           };
           oscillator.start(at);
-          oscillator.stop(at + 0.25);
+          oscillator.stop(at + duration + 0.02);
         });
       });
       return true;

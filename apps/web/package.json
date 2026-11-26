@@ -17,7 +17,7 @@
     "typecheck": "tsc --noEmit",
     "test": "pnpm test:payments && pnpm test:whatsapp && pnpm test:auth && pnpm test:admin && pnpm test:dashboard && pnpm test:cite && pnpm test:file",
     "test:auth": "node --test tests/auth-session.test.mjs",
-    "test:payments": "node --test tests/duitku.test.mjs tests/shield-cleanup.test.mjs tests/checkout-upload.test.mjs",
+    "test:payments": "node --test tests/duitku.test.mjs tests/shield-cleanup.test.mjs tests/checkout-upload.test.mjs tests/promo-eligibility.test.mjs",
     "test:whatsapp": "node --test tests/fonnte.test.mjs"
   },
   "dependencies": {

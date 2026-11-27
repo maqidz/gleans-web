@@ -31,7 +31,7 @@ export function BackToTop() {
       onClick={scrollToTop}
       className="pointer-events-auto mr-1 flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary md:mr-3"
     >
-      <ArrowUpToLine aria-hidden="true" className="size-6" />
+      <ArrowUpToLine aria-hidden="true" className="size-6 text-white!" />
     </button>
   );
 }

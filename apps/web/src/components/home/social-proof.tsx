@@ -20,7 +20,7 @@ export function SocialProof() {
       <p className="container-page text-center text-sm md:text-base">
         Gleans telah dipercaya oleh 50.000+ mahasiswa di seluruh Indonesia.
       </p>
-      <div className="overflow-hidden bg-white pt-0 pb-6 motion-reduce:overflow-x-auto md:pb-8">
+      <div className="overflow-hidden bg-background pt-0 pb-6 motion-reduce:overflow-x-auto md:pb-8">
         <ul className="flex w-max items-center gap-12 animate-marquee hover:[animation-play-state:paused] motion-reduce:animate-none">
           {logos.map((logo, i) => (
             <li

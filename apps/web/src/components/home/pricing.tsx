@@ -40,7 +40,7 @@ export async function Pricing() {
                 <div className="flex flex-col gap-8">
                   <div className="flex items-center justify-between gap-8">
                     <span className="flex size-12 shrink-0 items-center justify-center rounded-[16px] bg-primary text-white">
-                      <PlanIcon aria-hidden="true" className="size-6" />
+                      <PlanIcon aria-hidden="true" className="size-6 text-white!" />
                     </span>
                     <div className="flex flex-col items-end gap-1 text-right">
                       <p className="text-2xl font-semibold">{formatRupiah(packagePrice)}</p>

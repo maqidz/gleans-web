@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AdminFilterDropdown } from "./filter-dropdown";
+import { ChartPeriodPicker } from "./chart-period-picker";
+import { chartHistory, jakartaToday, presetRange, rangeLabel, type ChartPreset, type ChartRange } from "../lib/chart-period";
 import { formatRupiah } from "@/lib/format";
 import { useAdmin } from "./provider";
 
@@ -10,24 +11,19 @@ const shortMoney = (value: number) => value >= 1000000 ? `${new Intl.NumberForma
 
 export function AdminSummaryCharts() {
   const { state } = useAdmin();
-  const [days, setDays] = useState(7);
+  const [preset, setPreset] = useState<ChartPreset>("last7");
+  const [range, setRange] = useState<ChartRange | null>(null);
   const [today, setToday] = useState<string | null>(null);
   useEffect(() => {
-    const parts = new Intl.DateTimeFormat("en", { timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
-    const part = (type: string) => parts.find(p => p.type === type)?.value;
-    setToday(`${part("year")}-${part("month")}-${part("day")}`);
+    setToday(jakartaToday());
   }, []);
   if (!today) return <div className="mt-7 h-80 rounded-[24px] bg-surface" aria-label="Memuat grafik"/>;
-  const dates = Array.from({ length: days }, (_, i) => {
-    const day = new Date(`${today}T00:00:00Z`);
-    day.setUTCDate(day.getUTCDate() - days + 1 + i);
-    return { date: day.toISOString().slice(0, 10), label: new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", timeZone: "UTC" }).format(day).toUpperCase() };
-  });
-  const history = dates.map(d => ({ date: d.date, orders: state.orders.filter(o => o.date === d.date).length, income: state.orders.filter(o => o.date === d.date && o.payment === "Berhasil").reduce((sum, o) => sum + o.amount, 0) }));
-  const income = dates.map(d => ({ ...d, value: history.find(p => p.date === d.date)?.income || 0 }));
-  const orders = dates.map(d => ({ ...d, value: history.find(p => p.date === d.date)?.orders || 0 }));
+  const selectedRange = range ?? presetRange("last7", today);
+  const history = chartHistory(state.orders, selectedRange).map(day => ({ ...day, label: new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${day.date}T00:00:00Z`)).toUpperCase() }));
+  const income = history.map(day => ({ ...day, value: day.income }));
+  const orders = history.map(day => ({ ...day, value: day.orders }));
   return <section className="mt-7" aria-label="Grafik pendapatan dan pesanan">
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Tren {days} hari terakhir</h2><div className="ml-auto flex flex-wrap items-center justify-end gap-3"><AdminFilterDropdown label={`Periode grafik: ${days} hari`} value={`${days} hari`} options={["7 hari","14 hari","30 hari"]} onChange={value=>setDays(parseInt(value,10))}/></div></div>
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div className="min-w-0"><h2 className="font-semibold">Tren pendapatan dan pesanan</h2><p className="mt-1 text-xs text-muted-foreground">{rangeLabel(selectedRange)}</p></div><ChartPeriodPicker today={today} value={selectedRange} preset={preset} onChange={(next, nextPreset) => { setRange(next); setPreset(nextPreset); }} /></div>
     <div className="grid min-w-0 gap-4 xl:grid-cols-2">
       <BarChart title="TOTAL PENDAPATAN" points={income} money/>
       <BarChart title="TOTAL PESANAN" points={orders}/>

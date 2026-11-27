@@ -56,11 +56,11 @@ export function useNavigationAccount() {
   return account;
 }
 
-export function AuthNav({ account, onNavigate }: { account: NavigationAccount | null; onNavigate?: () => void }) {
-  if (!account) return <div className="flex items-center gap-3"><Button asChild size="pill-sm" variant="outline" className="w-[100px]"><Link href="/masuk" onClick={onNavigate}>Masuk</Link></Button><Button asChild size="pill-sm" className="w-[100px]"><Link href="/daftar" onClick={onNavigate}>Daftar</Link></Button></div>;
+export function AuthNav({ account, onNavigate, fullWidth = false }: { account: NavigationAccount | null; onNavigate?: () => void; fullWidth?: boolean }) {
+  if (!account) return <div className={fullWidth ? "grid w-full min-w-0 grid-cols-2 gap-3" : "flex items-center gap-3"}><Button asChild size="pill-sm" variant="outline" className={fullWidth ? "h-11 w-full min-w-0" : "w-[100px]"}><Link href="/masuk" onClick={onNavigate}>Masuk</Link></Button><Button asChild size="pill-sm" className={fullWidth ? "h-11 w-full min-w-0" : "w-[100px]"}><Link href="/daftar" onClick={onNavigate}>Daftar</Link></Button></div>;
   return <DropdownMenu>
     <DropdownMenuTrigger asChild>
-      <Button variant="ghost" aria-label={`Menu akun ${account.name}`} className="h-11 min-w-0 gap-2 rounded-full border border-border bg-white px-3">
+      <Button variant="ghost" aria-label={`Menu akun ${account.name}`} className={`h-11 min-w-0 gap-2 rounded-full border border-border bg-white px-3 ${fullWidth ? "w-full justify-start" : ""}`}>
         <span aria-hidden className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent font-medium text-primary">{account.name[0]?.toUpperCase()}</span>
         <span title={account.name} className="max-w-40 truncate sm:max-w-48">{account.name}</span>
         <ChevronDown className="size-4 shrink-0" />

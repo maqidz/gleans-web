@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { Quote, Star } from "lucide-react";
 import { SectionHeading } from "@/components/layout/section-heading";
 
 const TESTIMONIALS = [
@@ -43,7 +44,7 @@ function TestimonialCard({
   return (
     <figure className={className} aria-hidden={hidden}>
       <div className="flex flex-col gap-6">
-        <Image src="/images/icon-quote.webp" alt="" width={20} height={20} className="size-5" />
+        <Quote aria-hidden="true" className="size-5 rotate-180 fill-primary text-primary" strokeWidth={0} />
         <blockquote className="text-lg leading-relaxed md:text-xl lg:text-2xl lg:leading-[1.5]">{quote}</blockquote>
       </div>
       <figcaption className="flex items-center gap-4">
@@ -59,7 +60,7 @@ function TestimonialCard({
           <p className="text-muted-foreground truncate text-sm md:text-base">{campus}</p>
         </div>
         <span className="flex items-center gap-2 text-lg md:text-xl">
-          <Image src="/images/icon-star.webp" alt="" width={20} height={20} className="size-5" />
+          <Star aria-hidden="true" className="size-5 fill-primary text-primary" strokeWidth={0} />
           5.0
         </span>
       </figcaption>

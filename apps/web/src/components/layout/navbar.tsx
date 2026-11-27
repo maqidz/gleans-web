@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { AuthNav, useNavigationAccount } from "@/features/auth/components/auth-nav";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, ChevronDown, Menu, X } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@gleans/ui/button";
@@ -33,7 +33,7 @@ function SoonBadge() {
 
 function ProductDetails({ product }: { product: (typeof PRODUCTS)[number] }) {
   return <>
-    <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl border bg-surface">
+    <span className="flex size-12 shrink-0 items-center justify-center rounded-[16px] border bg-surface">
       <Image src={product.icon} alt="" width={26} height={26} className="size-6" />
     </span>
     <span className="flex min-w-0 flex-1 flex-col gap-1">
@@ -46,19 +46,47 @@ function ProductDetails({ product }: { product: (typeof PRODUCTS)[number] }) {
 export function Navbar() {
   const account = useNavigationAccount();
   const [open, setOpen] = useState(false);
+  const [desktopProductsOpen, setDesktopProductsOpen] = useState(false);
   const [productsOpen, setProductsOpen] = useState(false);
   const [soonName, setSoonName] = useState<string | null>(null);
   const [soonOpen, setSoonOpen] = useState(false);
 
+  useEffect(() => {
+    const breakpoint = window.matchMedia("(min-width: 1024px)");
+    function closeMenus() {
+      setOpen(false);
+      setDesktopProductsOpen(false);
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") closeMenus();
+    }
+    breakpoint.addEventListener("change", closeMenus);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      breakpoint.removeEventListener("change", closeMenus);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, []);
+
   return (
-    <header className="sticky top-0 z-40 border-b border-transparent bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+    <>
+    {(open || desktopProductsOpen) && (
+      <button
+        type="button"
+        aria-label="Tutup menu navigasi"
+        tabIndex={-1}
+        onClick={() => { setOpen(false); setDesktopProductsOpen(false); }}
+        className={cn("fixed inset-0 z-35 cursor-default! bg-black/25 backdrop-blur-sm pointer-events-auto", open ? "lg:hidden" : "hidden lg:block")}
+      />
+    )}
+    <header className={cn("sticky top-0 z-40 border-b border-transparent backdrop-blur", open || desktopProductsOpen ? "bg-white" : "bg-white/90 supports-[backdrop-filter]:bg-white/80")}>
       <div className="flex h-16 items-center justify-between px-5 md:px-8 lg:h-[68px] lg:px-10">
         <Link href="/" aria-label="Gleans - Beranda" className="shrink-0">
           <Logo className="h-7 lg:h-[34px]" />
         </Link>
 
         <nav className="hidden items-center gap-6 lg:flex">
-          <DropdownMenu>
+          <DropdownMenu open={desktopProductsOpen} onOpenChange={setDesktopProductsOpen}>
             <DropdownMenuTrigger className="group inline-flex items-center gap-2 text-base outline-none">
               Produk
               <ChevronDown className="size-5 transition-transform group-data-[state=open]:rotate-180" />
@@ -68,11 +96,11 @@ export function Navbar() {
                 <p className="mb-3 px-3 text-[11px] font-medium tracking-[0.16em] text-muted-foreground">LAYANAN GLEANS</p>
                 <div className="space-y-1">
                   {PRODUCTS.map((product) => product.soon ? (
-                    <DropdownMenuItem key={product.href} className="cursor-pointer items-center gap-4 rounded-2xl p-3 focus:bg-surface" onSelect={() => { setSoonName(product.name); setSoonOpen(true); }}>
+                    <DropdownMenuItem key={product.href} className="cursor-pointer items-center gap-4 rounded-[16px] p-3 focus:bg-surface" onSelect={() => { setSoonName(product.name); setSoonOpen(true); }}>
                       <ProductDetails product={product} />
                     </DropdownMenuItem>
                   ) : (
-                    <DropdownMenuItem key={product.href} asChild className="cursor-pointer rounded-2xl p-3 focus:bg-surface">
+                    <DropdownMenuItem key={product.href} asChild className="cursor-pointer rounded-[16px] p-3 focus:bg-surface">
                       <Link href={product.href} className="flex items-center gap-4"><ProductDetails product={product} /></Link>
                     </DropdownMenuItem>
                   ))}
@@ -123,7 +151,7 @@ export function Navbar() {
       </div>
 
       {open && (
-        <div className="absolute inset-x-0 top-full max-h-[calc(100dvh-64px)] overflow-y-auto border-t bg-white lg:hidden">
+        <div className="absolute inset-x-0 top-full max-h-[calc(100dvh-64px)] overflow-y-auto border-t bg-white shadow-[0_16px_32px_-12px_rgba(0,27,51,0.25)] lg:hidden">
           <nav className="flex flex-col">
             <button
               type="button"
@@ -175,7 +203,7 @@ export function Navbar() {
             ))}
           </nav>
           <div className="mt-6 flex gap-3 px-5 pb-6">
-            <AuthNav account={account} onNavigate={() => setOpen(false)} />
+            <AuthNav account={account} onNavigate={() => setOpen(false)} fullWidth />
           </div>
         </div>
       )}
@@ -194,5 +222,6 @@ export function Navbar() {
         </DialogContent>
       </Dialog>
     </header>
+    </>
   );
 }

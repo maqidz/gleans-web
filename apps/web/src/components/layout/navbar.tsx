@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { AuthNav, useNavigationAccount } from "@/features/auth/components/auth-nav";
 import { useState } from "react";
-import { ChevronDown, Menu, X } from "lucide-react";
+import { ArrowRight, ChevronDown, Menu, X } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@gleans/ui/button";
 import {
@@ -31,6 +31,18 @@ function SoonBadge() {
   );
 }
 
+function ProductDetails({ product }: { product: (typeof PRODUCTS)[number] }) {
+  return <>
+    <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl border bg-surface">
+      <Image src={product.icon} alt="" width={26} height={26} className="size-6" />
+    </span>
+    <span className="flex min-w-0 flex-1 flex-col gap-1">
+      <span className="flex flex-wrap items-center gap-2 text-base font-medium text-foreground">{product.name}{product.soon && <SoonBadge />}</span>
+      <span className="text-sm leading-relaxed text-muted-foreground">{product.description}</span>
+    </span>
+  </>;
+}
+
 export function Navbar() {
   const account = useNavigationAccount();
   const [open, setOpen] = useState(false);
@@ -51,42 +63,37 @@ export function Navbar() {
               Produk
               <ChevronDown className="size-5 transition-transform group-data-[state=open]:rotate-180" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" sideOffset={12} className="w-80 rounded-2xl p-2">
-              {PRODUCTS.map((p) =>
-                p.soon ? (
-                  <DropdownMenuItem
-                    key={p.href}
-                    className="rounded-xl p-3"
-                    onSelect={() => {
-                      setSoonName(p.name);
-                      setSoonOpen(true);
-                    }}
-                  >
-                    <span className="flex w-full items-start gap-3">
-                      <Image src={p.icon} alt="" width={32} height={32} className="mt-0.5 size-8 shrink-0" />
-                      <span className="flex flex-col gap-0.5">
-                        <span className="flex flex-wrap items-center gap-2 font-medium">
-                          {p.name} <span className="text-muted-foreground font-normal">· {p.short}</span>
-                          <SoonBadge />
-                        </span>
-                        <span className="text-muted-foreground text-xs leading-snug">{p.description}</span>
-                      </span>
-                    </span>
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem key={p.href} asChild className="rounded-xl p-3">
-                    <Link href={p.href} className="flex items-start gap-3">
-                      <Image src={p.icon} alt="" width={32} height={32} className="mt-0.5 size-8 shrink-0" />
-                      <span className="flex flex-col gap-0.5">
-                        <span className="font-medium">
-                          {p.name} <span className="text-muted-foreground font-normal">· {p.short}</span>
-                        </span>
-                        <span className="text-muted-foreground text-xs leading-snug">{p.description}</span>
-                      </span>
-                    </Link>
-                  </DropdownMenuItem>
-                ),
-              )}
+            <DropdownMenuContent align="start" sideOffset={18} collisionPadding={20} className="grid w-[780px] max-w-[calc(100vw-40px)] grid-cols-[1.15fr_1fr] overflow-hidden rounded-[24px] border bg-white p-0 shadow-xl ring-0">
+              <div className="p-6">
+                <p className="mb-3 px-3 text-[11px] font-medium tracking-[0.16em] text-muted-foreground">LAYANAN GLEANS</p>
+                <div className="space-y-1">
+                  {PRODUCTS.map((product) => product.soon ? (
+                    <DropdownMenuItem key={product.href} className="cursor-pointer items-center gap-4 rounded-2xl p-3 focus:bg-surface" onSelect={() => { setSoonName(product.name); setSoonOpen(true); }}>
+                      <ProductDetails product={product} />
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem key={product.href} asChild className="cursor-pointer rounded-2xl p-3 focus:bg-surface">
+                      <Link href={product.href} className="flex items-center gap-4"><ProductDetails product={product} /></Link>
+                    </DropdownMenuItem>
+                  ))}
+                </div>
+              </div>
+              <aside aria-label="Sorotan produk" className="border-l bg-accent/40 p-6">
+                <p className="mb-5 text-[11px] font-medium tracking-[0.16em] text-muted-foreground">SOROTAN</p>
+                <DropdownMenuItem asChild className="block cursor-pointer overflow-hidden rounded-[20px] border bg-white p-0 focus:bg-white focus:ring-2 focus:ring-primary/30">
+                  <Link href="/deteksi-ai" className="group/sorotan">
+                    <div className="flex h-40 items-center justify-center overflow-hidden bg-accent">
+                      <Image src="/images/gleans-illustration-480.webp" alt="" width={480} height={360} className="h-full w-full object-contain p-3 transition-transform duration-300 group-hover/sorotan:scale-105 motion-reduce:transform-none" />
+                    </div>
+                    <div className="p-5">
+                      <p className="text-[11px] font-medium tracking-wide text-primary">GLEANS SHIELD</p>
+                      <h2 className="mt-2 text-xl font-semibold leading-snug tracking-tight">Kumpulkan tulisan dengan lebih tenang.</h2>
+                      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">Periksa AI dan plagiarisme pada dokumenmu, lalu unduh laporan hasil pemeriksaannya.</p>
+                      <span className="mt-5 flex min-h-10 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-medium text-white!">Mulai cek dokumen<ArrowRight aria-hidden="true" className="size-4 text-white!" /></span>
+                    </div>
+                  </Link>
+                </DropdownMenuItem>
+              </aside>
             </DropdownMenuContent>
           </DropdownMenu>
           {NAV_LINKS.map((l) => (
@@ -116,7 +123,7 @@ export function Navbar() {
       </div>
 
       {open && (
-        <div className="absolute inset-x-0 top-full border-t bg-white lg:hidden">
+        <div className="absolute inset-x-0 top-full max-h-[calc(100dvh-64px)] overflow-y-auto border-t bg-white lg:hidden">
           <nav className="flex flex-col">
             <button
               type="button"
@@ -139,25 +146,18 @@ export function Navbar() {
                         setSoonName(p.name);
                         setSoonOpen(true);
                       }}
-                      className="flex items-center gap-3 px-5 py-4 text-left text-base text-muted-foreground"
+                      className="flex items-center gap-3 px-5 py-4 text-left hover:bg-surface"
                     >
-                      <Image src={p.icon} alt="" width={32} height={32} className="size-8 shrink-0" />
-                      <span className="flex flex-wrap items-center gap-2">
-                        {p.name} <span>· {p.short}</span>
-                        <SoonBadge />
-                      </span>
+                      <ProductDetails product={p} />
                     </button>
                   ) : (
                     <Link
                       key={p.href}
                       href={p.href}
                       onClick={() => setOpen(false)}
-                      className="flex items-center gap-3 px-5 py-4 text-muted-foreground"
+                      className="flex items-center gap-3 px-5 py-4 hover:bg-surface"
                     >
-                      <Image src={p.icon} alt="" width={32} height={32} className="size-8 shrink-0" />
-                      <span className="text-base">
-                        {p.name} <span className="text-muted-foreground">· {p.short}</span>
-                      </span>
+                      <ProductDetails product={p} />
                     </Link>
                   ),
                 )}

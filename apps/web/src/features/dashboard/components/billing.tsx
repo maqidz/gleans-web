@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { BillingRequestError, billingRequest } from "@/features/payments/billing/client";
 import { BILLING_ID, MAX_TOPUP, MIN_TOPUP, type BillingSnapshot, type BillingTransaction } from "@/features/payments/billing/types";
 import { formatRupiah } from "@/lib/format";
-import { PLANS, planBenefits } from "@/lib/plans";
+import { PLANS, planBenefits, type PackagePrices } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 import { Choice, dateLabel, Empty, fieldClass, Heading, Panel } from "./shared";
 
@@ -34,7 +34,7 @@ function transactionTitle(transaction: BillingTransaction) {
   return `Paket Shield ${PLANS.find(plan => plan.id === transaction.plan_id)?.name ?? ""}`.trim();
 }
 
-export function DashboardBilling() {
+export function DashboardBilling({ initialPackagePrices }: { initialPackagePrices: PackagePrices }) {
   const params = useSearchParams();
   const returnedId = params.get("billing");
   const [snapshot, setSnapshot] = useState<BillingSnapshot | null>(null);
@@ -137,7 +137,7 @@ export function DashboardBilling() {
         <Panel className="border bg-white">
           <div className="flex items-center gap-2 text-sm text-muted-foreground"><Wallet aria-hidden="true" className="size-5" />TOTAL SALDO</div>
           <p className="mt-4 text-3xl font-semibold">{formatRupiah(snapshot?.balance ?? 0)}</p>
-          <Button size="pill-sm" className="mt-5" disabled={!snapshot} onClick={() => openTopup()}><Plus aria-hidden="true" />Isi saldo</Button>
+          <Button size="pill-sm" className="mt-5" onClick={() => openTopup()}><Plus aria-hidden="true" />Isi saldo</Button>
         </Panel>
         <Panel className="border bg-white">
           <div className="flex items-center gap-2 text-sm text-muted-foreground"><Layers aria-hidden="true" className="size-5" />TOTAL KUOTA</div>
@@ -148,11 +148,11 @@ export function DashboardBilling() {
         <h2 className="mb-4 text-lg font-semibold">Pilih paket Shield</h2>
         <div className="grid gap-4 md:grid-cols-3">
           {PLANS.map(item => {
-            const price = snapshot?.packagePrices[item.id];
+            const price = snapshot?.packagePrices[item.id] ?? initialPackagePrices[item.id];
             return (
               <Panel key={item.id} className="flex flex-col border bg-white">
                 <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">{item.name}</h3><span className="text-xs text-primary">{item.checks}x cek</span></div>
-                <p className="mt-6 text-2xl font-semibold">{formatRupiah(price ?? 0)}</p>
+                <p className="mt-6 text-2xl font-semibold">{formatRupiah(price)}</p>
                 <p className="mt-2 flex-1 text-xs leading-relaxed text-muted-foreground">{item.blurb}</p>
                 <ul aria-label={`Benefit paket ${item.name}`} className="mt-5 space-y-1.5 text-xs leading-relaxed">
                   {planBenefits(item).map(benefit => (
@@ -162,8 +162,7 @@ export function DashboardBilling() {
                     </li>
                   ))}
                 </ul>
-                <Button size="pill-sm" className="mt-6" disabled={price == null} onClick={() => {
-                  if (price == null) return;
+                <Button size="pill-sm" className="mt-6" onClick={() => {
                   setActionError("");
                   setIntent({ kind: "package", requestId: crypto.randomUUID(), planId: item.id, method: "qris", expectedAmount: price });
                 }}>Pilih {item.name}</Button>
@@ -245,13 +244,13 @@ export function DashboardBilling() {
             <fieldset disabled={busy} aria-describedby={insufficientBalance ? "package-balance-error" : undefined} className="min-w-0 space-y-2">
               <legend className="mb-3 text-sm font-medium">Metode pembayaran</legend>
               {methods.map(option => (
-                <label key={option.value} className={cn("flex cursor-pointer items-center gap-3 rounded-2xl border p-4 transition-colors focus-within:ring-2 focus-within:ring-primary", intent.method === option.value ? "border-primary bg-accent" : "bg-white hover:bg-surface", busy && "cursor-wait opacity-60")}>
+                <label key={option.value} className={cn("flex cursor-pointer items-center gap-3 rounded-2xl border p-4 transition-colors focus-within:ring-2 focus-within:ring-primary", intent.method === option.value ? "border-primary bg-accent" : "bg-white hover:bg-surface", busy && "cursor-wait opacity-60", option.value === "balance" && !snapshot && "cursor-wait opacity-60")}>
                   <option.icon aria-hidden="true" className="size-5 shrink-0 text-primary" />
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-medium">{option.label}</span>
-                    <span className="mt-1 block text-xs text-muted-foreground">{option.value === "balance" ? `Saldo tersedia ${formatRupiah(snapshot?.balance ?? 0)}` : "Scan QRIS untuk membayar"}</span>
+                    <span className="mt-1 block text-xs text-muted-foreground">{option.value === "balance" ? snapshot ? `Saldo tersedia ${formatRupiah(snapshot.balance)}` : "Memuat saldo…" : "Scan QRIS untuk membayar"}</span>
                   </span>
-                  <input type="radio" name="package-payment-method" value={option.value} checked={intent.method === option.value} onChange={() => {
+                  <input type="radio" name="package-payment-method" value={option.value} checked={intent.method === option.value} disabled={option.value === "balance" && !snapshot} onChange={() => {
                     setActionError("");
                     setIntent(previous => previous?.kind === "package" ? { ...previous, method: option.value } : previous);
                   }} className="size-4 shrink-0 accent-primary" />

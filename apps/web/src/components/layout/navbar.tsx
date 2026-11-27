@@ -87,9 +87,9 @@ export function Navbar() {
                     </div>
                     <div className="p-5">
                       <p className="text-[11px] font-medium tracking-wide text-primary">GLEANS SHIELD</p>
-                      <h2 className="mt-2 text-xl font-semibold leading-snug tracking-tight">Kumpulkan tulisan dengan lebih tenang.</h2>
+                      <h2 className="mt-2 text-xl font-semibold leading-snug tracking-tight">Cek tulisanmu dengan GPTZero 5.0.</h2>
                       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">Periksa AI dan plagiarisme pada dokumenmu, lalu unduh laporan hasil pemeriksaannya.</p>
-                      <span className="mt-5 flex min-h-10 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-medium text-white!">Mulai cek dokumen<ArrowRight aria-hidden="true" className="size-4 text-white!" /></span>
+                      <span className="mt-5 flex min-h-10 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-medium text-white! **:text-white!">Mulai cek dokumen<ArrowRight aria-hidden="true" className="size-4 shrink-0 text-white!" /></span>
                     </div>
                   </Link>
                 </DropdownMenuItem>

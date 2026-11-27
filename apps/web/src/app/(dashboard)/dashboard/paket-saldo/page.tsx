@@ -1,2 +1,7 @@
 import { DashboardBilling } from "@/features/dashboard/components/billing";
-export default function Page() { return <DashboardBilling />; }
+import { displayShieldPricing } from "@/features/orders/lib/shield-pricing";
+
+export default async function Page() {
+  const { packages } = await displayShieldPricing();
+  return <DashboardBilling initialPackagePrices={packages} />;
+}
